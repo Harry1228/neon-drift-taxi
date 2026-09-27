@@ -3,65 +3,113 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Neon Drift Taxi</title>
+  <title>Crazy Taxi 2D Arcade</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-    body { background-color: #0b0d14; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; touch-action: none; }
+    body { background-color: #222; color: #fff; font-family: "Impact", "Arial Black", sans-serif; overflow: hidden; touch-action: none; }
+
+    /* Crazy Taxi Arcade HUD */
     #hud {
-      position: absolute; top: 12px; left: 16px; right: 16px;
-      display: flex; justify-content: space-between; align-items: center;
-      font-weight: 700; font-size: 16px; pointer-events: none; z-index: 10;
-    }
-    #cash { color: #ffe600; text-shadow: 0 0 10px rgba(255,230,0,0.5); font-size: 20px; }
-    #status { color: #00f0ff; text-align: center; }
-    #upgrade-btn {
-      position: absolute; top: 10px; right: 16px; z-index: 20;
-      background: linear-gradient(135deg, #ff0055, #ff5500); color: white;
-      border: none; padding: 8px 16px; font-weight: bold; border-radius: 8px;
-      cursor: pointer; display: none; box-shadow: 0 4px 15px rgba(255,0,85,0.4);
-    }
-    canvas { display: block; width: 100vw; height: 100vh; }
-    .touch-controls {
-      position: absolute; bottom: 24px; left: 0; right: 0;
-      display: flex; justify-content: space-between; padding: 0 25px;
+      position: absolute; top: 10px; left: 10px; right: 10px;
+      display: flex; justify-content: space-between; align-items: flex-start;
       pointer-events: none; z-index: 10;
     }
-    .btn-group { display: flex; gap: 15px; pointer-events: auto; }
-    .t-btn {
-      width: 65px; height: 65px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3);
-      background: rgba(255,255,255,0.08); color: white; font-size: 22px; font-weight: bold;
-      display: flex; align-items: center; justify-content: center; touch-action: none;
-      backdrop-filter: blur(4px);
+    
+    /* Countdown Timer (Top-Left) */
+    #timer-box {
+      background: #000; border: 3px solid #ffcc00; border-radius: 6px;
+      padding: 4px 10px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.6);
     }
-    .t-btn:active { background: rgba(255,255,255,0.3); border-color: #00f0ff; }
+    #timer-val {
+      font-size: 32px; color: #ff2200; text-shadow: 2px 2px 0 #ffe600, -1px -1px 0 #000;
+      letter-spacing: 2px;
+    }
+    #timer-sub { font-size: 10px; color: #ffcc00; letter-spacing: 1px; }
+
+    /* Crazy Taxi Roller Meter (Top-Right) */
+    #meter-box {
+      background: #ffcc00; border: 3px solid #b8860b; border-radius: 6px;
+      padding: 4px 8px; text-align: right; box-shadow: 0 4px 10px rgba(0,0,0,0.6);
+    }
+    .roller-line {
+      background: #111; color: #00ff66; font-family: "Courier New", monospace;
+      font-weight: 900; font-size: 16px; padding: 2px 6px; border-radius: 3px;
+      letter-spacing: 2px; margin-bottom: 3px; border: 1px solid #333;
+    }
+    .roller-label { font-size: 9px; color: #333; font-weight: bold; }
+
+    /* Gear Indicator (Bottom-Right) */
+    #gear-box {
+      position: absolute; bottom: 105px; right: 20px;
+      background: #ffcc00; border: 3px solid #333; border-radius: 6px;
+      padding: 4px 8px; text-align: center; font-size: 18px; font-weight: 900;
+      color: #111; z-index: 10; pointer-events: none;
+    }
+    .gear-active { background: #ff2200; color: #fff; padding: 2px 6px; border-radius: 4px; }
+
+    canvas { display: block; width: 100vw; height: 100vh; }
+
+    /* On-Screen Driving Controls */
+    .touch-controls {
+      position: absolute; bottom: 20px; left: 0; right: 0;
+      display: flex; justify-content: space-between; padding: 0 20px;
+      pointer-events: none; z-index: 20;
+    }
+    .btn-group { display: flex; gap: 12px; pointer-events: auto; }
+    .t-btn {
+      width: 68px; height: 68px; border-radius: 50%; border: 3px solid #ffcc00;
+      background: rgba(0, 0, 0, 0.65); color: #fff; font-size: 26px; font-weight: bold;
+      display: flex; align-items: center; justify-content: center; touch-action: none;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+    }
+    .t-btn:active { background: #ffcc00; color: #000; }
+    .pedal-gas { background: rgba(0, 180, 0, 0.6); border-color: #00ff66; }
+    .pedal-brake { background: rgba(200, 0, 0, 0.6); border-color: #ff3333; }
   </style>
 </head>
 <body>
+
+  <!-- Retro HUD -->
   <div id="hud">
-    <div id="cash">CASH: $0</div>
-    <div id="status">Stop inside the CYAN circle!</div>
+    <div id="timer-box">
+      <div id="timer-val">45"00</div>
+      <div id="timer-sub">TIME LIMIT</div>
+    </div>
+
+    <div id="meter-box">
+      <div class="roller-label">FARE</div>
+      <div class="roller-line" id="fare-val">$000.00</div>
+      <div class="roller-label">TOTAL EARNED</div>
+      <div class="roller-line" id="total-val">$000.00</div>
+    </div>
   </div>
-  <button id="upgrade-btn" onclick="buyUpgrade()">Upgrade Engine ($100)</button>
+
+  <div id="gear-box">
+    <span id="gear-d" class="gear-active">D</span> | <span id="gear-r">R</span>
+  </div>
 
   <canvas id="game"></canvas>
 
+  <!-- Mobile Touch Pedals & Steering -->
   <div class="touch-controls">
     <div class="btn-group">
       <div class="t-btn" id="btn-left">◀</div>
       <div class="t-btn" id="btn-right">▶</div>
     </div>
     <div class="btn-group">
-      <div class="t-btn" id="btn-brake">▼</div>
-      <div class="t-btn" id="btn-gas">▲</div>
+      <div class="t-btn pedal-brake" id="btn-brake">R</div>
+      <div class="t-btn pedal-gas" id="btn-gas">GAS</div>
     </div>
   </div>
 
   <script>
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
-    const cashLabel = document.getElementById("cash");
-    const statusLabel = document.getElementById("status");
-    const upgradeBtn = document.getElementById("upgrade-btn");
+    const timerVal = document.getElementById("timer-val");
+    const fareVal = document.getElementById("fare-val");
+    const totalVal = document.getElementById("total-val");
+    const gearD = document.getElementById("gear-d");
+    const gearR = document.getElementById("gear-r");
 
     function resize() {
       canvas.width = window.innerWidth;
@@ -70,19 +118,18 @@
     window.addEventListener("resize", resize);
     resize();
 
+    // Sound FX Generator
     let audioCtx = null;
     function initAudio() {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       if (audioCtx.state === "suspended") audioCtx.resume();
     }
-
-    function playChime(freq1, freq2, duration) {
+    function playBeep(freq, type = "sine", duration = 0.15) {
       if (!audioCtx) return;
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(freq1, audioCtx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(freq2, audioCtx.currentTime + duration);
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
       gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
       osc.connect(gain);
@@ -91,41 +138,25 @@
       osc.stop(audioCtx.currentTime + duration);
     }
 
-    function playCrash() {
-      if (!audioCtx) return;
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = "sawtooth";
-      osc.frequency.setValueAtTime(110, audioCtx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.3);
-      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.3);
-    }
-
-    let wallet = 0;
+    // Game Variables
+    let totalScore = 0;
+    let currentFare = 0;
+    let timeLeft = 45.0;
     let hasPassenger = false;
-    let maxSpeed = 5.2;
+    let waveTick = 0;
 
     const car = {
-      x: canvas.width / 2, y: canvas.height / 2,
-      speed: 0, angle: 0, turnSpeed: 0.065, accel: 0.22, friction: 0.95
+      x: canvas.width / 2, y: canvas.height * 0.7,
+      speed: 0, angle: -Math.PI / 2,
+      maxSpeed: 6.8, accel: 0.28, friction: 0.94, turnSpeed: 0.075
     };
 
-    let pickup = { x: 140, y: 160, r: 42, active: true };
-    let dropoff = { x: canvas.width - 140, y: canvas.height - 200, r: 42, active: false };
-    const keys = { left: false, right: false, gas: false, brake: false };
+    // Customer & Destination
+    let customer = { x: 140, y: 180, r: 52, active: true };
+    let dropoff = { x: canvas.width - 140, y: 220, r: 52, active: false };
 
-    const trafficColors = ["#9d4edd", "#3a86ff", "#00b4d8", "#f72585"];
-    const traffic = [
-      { x: -50, y: canvas.height * 0.32, speed: 2.6, w: 42, h: 22, color: trafficColors[0], dir: 1 },
-      { x: canvas.width + 50, y: canvas.height * 0.44, speed: -3.2, w: 42, h: 22, color: trafficColors[1], dir: -1 },
-      { x: -180, y: canvas.height * 0.68, speed: 2.2, w: 42, h: 22, color: trafficColors[2], dir: 1 },
-      { x: canvas.width + 120, y: canvas.height * 0.80, speed: -2.8, w: 42, h: 22, color: trafficColors[3], dir: -1 }
-    ];
+    // Keyboard & Touch Inputs
+    const keys = { left: false, right: false, gas: false, brake: false };
 
     window.addEventListener("keydown", (e) => {
       initAudio();
@@ -151,167 +182,305 @@
     bindTouch("btn-gas", "gas");
     bindTouch("btn-brake", "brake");
 
-    function buyUpgrade() {
-      if (wallet >= 100) {
-        wallet -= 100;
-        maxSpeed += 2.0;
-        car.turnSpeed += 0.012;
-        playChime(400, 880, 0.35);
-        updateHUD();
+    function formatNumber(num) {
+      return num.toFixed(2).padStart(6, "0");
+    }
+
+    function gameLoop() {
+      // 1. Countdown Timer
+      if (timeLeft > 0) {
+        timeLeft -= 1 / 60;
+        const sec = Math.floor(timeLeft);
+        const ms = Math.floor((timeLeft % 1) * 100);
+        timerVal.innerText = `${sec.toString().padStart(2, "0")}'${ms.toString().padStart(2, "0")}`;
+      } else {
+        timerVal.innerText = "00'00";
       }
-    }
 
-    function updateHUD() {
-      cashLabel.innerText = "CASH: $" + wallet;
-      upgradeBtn.style.display = wallet >= 100 ? "block" : "none";
-    }
-
-    let crashCooldown = 0;
-
-    function loop() {
+      // 2. Car Dynamics & Gear Display
       if (Math.abs(car.speed) > 0.4) {
-        if (keys.left) car.angle -= car.turnSpeed;
-        if (keys.right) car.angle += car.turnSpeed;
+        const dir = car.speed >= 0 ? 1 : -1;
+        if (keys.left) car.angle -= car.turnSpeed * dir;
+        if (keys.right) car.angle += car.turnSpeed * dir;
       }
-      if (keys.gas) car.speed = Math.min(car.speed + car.accel, maxSpeed);
-      else if (keys.brake) car.speed = Math.max(car.speed - car.accel * 1.3, -maxSpeed * 0.45);
-      else car.speed *= car.friction;
+
+      if (keys.gas) {
+        car.speed = Math.min(car.speed + car.accel, car.maxSpeed);
+      } else if (keys.brake) {
+        car.speed = Math.max(car.speed - car.accel * 1.2, -car.maxSpeed * 0.45);
+      } else {
+        car.speed *= car.friction;
+      }
+
+      // Update Gear UI
+      if (car.speed < -0.2) {
+        gearD.className = "";
+        gearR.className = "gear-active";
+      } else {
+        gearD.className = "gear-active";
+        gearR.className = "";
+      }
 
       car.x += Math.cos(car.angle) * car.speed;
       car.y += Math.sin(car.angle) * car.speed;
 
-      car.x = Math.max(25, Math.min(canvas.width - 25, car.x));
-      car.y = Math.max(25, Math.min(canvas.height - 25, car.y));
+      // Keep within bounds
+      car.x = Math.max(30, Math.min(canvas.width - 30, car.x));
+      car.y = Math.max(30, Math.min(canvas.height - 30, car.y));
 
-      const isStopped = Math.abs(car.speed) < 0.35;
+      const isStopped = Math.abs(car.speed) < 0.4;
+      waveTick += 0.08;
 
-      if (crashCooldown > 0) crashCooldown--;
-
-      for (let t of traffic) {
-        t.x += t.speed;
-        if (t.dir === 1 && t.x > canvas.width + 80) t.x = -80;
-        if (t.dir === -1 && t.x < -80) t.x = canvas.width + 80;
-
-        const dx = car.x - t.x;
-        const dy = car.y - t.y;
-        if (Math.abs(dx) < 32 && Math.abs(dy) < 22 && crashCooldown === 0) {
-          playCrash();
-          car.speed = -car.speed * 0.8;
-          car.x += dx * 0.5;
-          car.y += dy * 0.5;
-          crashCooldown = 45;
-          wallet = Math.max(0, wallet - 10);
-          updateHUD();
-          statusLabel.innerText = "CRASH! -$10 Repair Fee";
-          statusLabel.style.color = "#ff4444";
-        }
-      }
-
-      if (!hasPassenger && pickup.active) {
-        if (Math.hypot(car.x - pickup.x, car.y - pickup.y) < pickup.r && isStopped) {
+      // 3. Pickup Logic
+      if (!hasPassenger && customer.active) {
+        const d = Math.hypot(car.x - customer.x, car.y - customer.y);
+        if (d < customer.r && isStopped) {
           hasPassenger = true;
-          pickup.active = false;
-          dropoff.x = Math.random() * (canvas.width - 220) + 110;
-          dropoff.y = Math.random() * (canvas.height - 260) + 130;
+          customer.active = false;
+          dropoff.x = Math.random() * (canvas.width - 240) + 120;
+          dropoff.y = Math.random() * (canvas.height - 340) + 170;
           dropoff.active = true;
-          statusLabel.innerText = "Deliver to the PINK circle!";
-          statusLabel.style.color = "#ff0055";
-          playChime(320, 640, 0.25);
+          timeLeft += 15.0; // Bonus time
+          currentFare = 45.00;
+          fareVal.innerText = "$" + formatNumber(currentFare);
+          playBeep(520, "triangle", 0.2);
+          playBeep(780, "sine", 0.3);
         }
       }
 
+      // 4. Dropoff Logic
       if (hasPassenger && dropoff.active) {
-        if (Math.hypot(car.x - dropoff.x, car.y - dropoff.y) < dropoff.r && isStopped) {
+        const d = Math.hypot(car.x - dropoff.x, car.y - dropoff.y);
+        if (d < dropoff.r && isStopped) {
           hasPassenger = false;
           dropoff.active = false;
-          wallet += 50;
-          updateHUD();
-          statusLabel.innerText = "Fare Delivered! +$50";
-          statusLabel.style.color = "#ffe600";
-          playChime(550, 1100, 0.4);
+          totalScore += currentFare;
+          totalVal.innerText = "$" + formatNumber(totalScore);
+          currentFare = 0;
+          fareVal.innerText = "$000.00";
+          playBeep(660, "sine", 0.15);
+          playBeep(990, "triangle", 0.4);
 
           setTimeout(() => {
-            pickup.x = Math.random() * (canvas.width - 220) + 110;
-            pickup.y = Math.random() * (canvas.height - 260) + 130;
-            pickup.active = true;
-            statusLabel.innerText = "Stop inside the CYAN circle!";
-            statusLabel.style.color = "#00f0ff";
-          }, 1400);
+            customer.x = Math.random() * (canvas.width - 240) + 120;
+            customer.y = Math.random() * (canvas.height - 340) + 170;
+            customer.active = true;
+          }, 1200);
         }
       }
 
+      // RENDER CITY SCENE
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.04)";
-      ctx.lineWidth = 1;
-      for (let x = 0; x < canvas.width; x += 60) {
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
-      }
-      for (let y = 0; y < canvas.height; y += 60) {
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
-      }
+      // A. Asphalt Road
+      ctx.fillStyle = "#696969";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      ctx.setLineDash([15, 15]);
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
-      ctx.lineWidth = 2;
-      for (let t of traffic) {
-        ctx.beginPath(); ctx.moveTo(0, t.y); ctx.lineTo(canvas.width, t.y); ctx.stroke();
-      }
+      // B. Road Markings (White lane dashes)
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 4;
+      ctx.setLineDash([20, 20]);
+      ctx.beginPath();
+      ctx.moveTo(canvas.width / 2, 0);
+      ctx.lineTo(canvas.width / 2, canvas.height);
+      ctx.stroke();
       ctx.setLineDash([]);
 
-      if (pickup.active) {
-        ctx.fillStyle = "rgba(0, 240, 255, 0.2)";
-        ctx.strokeStyle = "#00f0ff";
-        ctx.lineWidth = 3;
+      // C. Sidewalks with Checkered Tiles (Top & Bottom)
+      drawSidewalk(0, 0, canvas.width, 110);
+      drawSidewalk(0, canvas.height - 90, canvas.width, 90);
+
+      // D. Red Brick Building Blocks
+      drawBuilding(20, 10, 180, 80);
+      drawBuilding(240, 10, 200, 80);
+
+      // E. Draw Customer (Sidewalk Dude)
+      if (customer.active) {
+        // Red Pulsing Ring
+        const pulse = Math.sin(waveTick * 2) * 4;
+        ctx.strokeStyle = "#ff1a1a";
+        ctx.lineWidth = 3.5;
         ctx.beginPath();
-        ctx.arc(pickup.x, pickup.y, pickup.r, 0, Math.PI * 2);
-        ctx.fill(); ctx.stroke();
+        ctx.arc(customer.x, customer.y, customer.r + pulse, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Customer Figure
+        drawPassengerFigure(customer.x, customer.y, Math.sin(waveTick * 3) > 0);
+
+        // Floating Red "$" Coin
+        const bob = Math.sin(waveTick * 3) * 6;
+        drawDollarBadge(customer.x, customer.y - 32 + bob);
       }
 
+      // F. Draw Destination Drop-Off
       if (dropoff.active) {
-        ctx.fillStyle = "rgba(255, 0, 85, 0.2)";
-        ctx.strokeStyle = "#ff0055";
-        ctx.lineWidth = 3;
+        ctx.fillStyle = "rgba(0, 255, 100, 0.25)";
+        ctx.strokeStyle = "#00ff66";
+        ctx.lineWidth = 4;
         ctx.beginPath();
         ctx.arc(dropoff.x, dropoff.y, dropoff.r, 0, Math.PI * 2);
-        ctx.fill(); ctx.stroke();
-      }
-
-      for (let t of traffic) {
-        ctx.save();
-        ctx.translate(t.x, t.y);
-        ctx.fillStyle = t.color;
-        ctx.shadowColor = t.color;
-        ctx.shadowBlur = 8;
-        ctx.fillRect(-t.w / 2, -t.h / 2, t.w, t.h);
+        ctx.fill();
+        ctx.stroke();
         ctx.fillStyle = "#ffffff";
-        if (t.dir === 1) {
-          ctx.fillRect(t.w / 2 - 3, -t.h / 2 + 3, 3, 4);
-          ctx.fillRect(t.w / 2 - 3, t.h / 2 - 7, 3, 4);
-        } else {
-          ctx.fillRect(-t.w / 2, -t.h / 2 + 3, 3, 4);
-          ctx.fillRect(-t.w / 2, t.h / 2 - 7, 3, 4);
-        }
-        ctx.restore();
+        ctx.font = "bold 14px Impact";
+        ctx.fillText("STOP HERE", dropoff.x - 30, dropoff.y + 5);
       }
 
+      // G. Crazy Taxi Yellow Convertible
       ctx.save();
       ctx.translate(car.x, car.y);
       ctx.rotate(car.angle);
-      ctx.shadowColor = "#ffe600";
-      ctx.shadowBlur = 10;
-      ctx.fillStyle = "#ffe600";
-      ctx.fillRect(-22, -12, 44, 24);
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = "#0b0d14";
-      ctx.fillRect(4, -9, 8, 18);
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(-4, -6, 6, 12);
+
+      // Taxi Shadow
+      ctx.fillStyle = "rgba(0,0,0,0.3)";
+      ctx.fillRect(-22, -10, 48, 28);
+
+      // Wheels
+      ctx.fillStyle = "#111";
+      ctx.fillRect(-18, -16, 10, 5);
+      ctx.fillRect(10, -16, 10, 5);
+      ctx.fillRect(-18, 11, 10, 5);
+      ctx.fillRect(10, 11, 10, 5);
+
+      // Yellow Body
+      ctx.fillStyle = "#ffcc00";
+      ctx.fillRect(-24, -13, 48, 26);
+
+      // Red Interior / Seats
+      ctx.fillStyle = "#c00";
+      ctx.fillRect(-10, -9, 18, 18);
+
+      // Driver
+      ctx.fillStyle = "#ffcc99";
+      ctx.beginPath();
+      ctx.arc(-2, 0, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Windshield
+      ctx.fillStyle = "#e0f7fa";
+      ctx.fillRect(8, -10, 4, 20);
+
+      // Taxi Checker Roof Decal
+      ctx.fillStyle = "#000";
+      ctx.fillRect(-20, -13, 4, 26);
       ctx.restore();
 
-      requestAnimationFrame(loop);
+      // H. Crazy Taxi Signature Guide Arrow (Top Center)
+      const target = hasPassenger ? dropoff : customer;
+      if (target.active) {
+        drawGuideArrow(target.x, target.y);
+      }
+
+      requestAnimationFrame(gameLoop);
     }
-    loop();
+
+    // Helper: Sidewalk Checker Pattern
+    function drawSidewalk(x, y, w, h) {
+      ctx.fillStyle = "#dcd6c8";
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = "#b5ad9e";
+      ctx.lineWidth = 1;
+      const size = 18;
+      for (let px = x; px < x + w; px += size) {
+        for (let py = y; py < y + h; py += size) {
+          ctx.strokeRect(px, py, size, size);
+        }
+      }
+      // Sidewalk Curb Line
+      ctx.fillStyle = "#8a857b";
+      ctx.fillRect(x, y + h - 5, w, 5);
+    }
+
+    // Helper: Red Brick Building
+    function drawBuilding(x, y, w, h) {
+      ctx.fillStyle = "#b22222";
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = "#800000";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x, y, w, h);
+
+      // Windows
+      ctx.fillStyle = "#87ceeb";
+      for (let wx = x + 12; wx < x + w - 15; wx += 24) {
+        ctx.fillRect(wx, y + 15, 14, 20);
+        ctx.fillRect(wx, y + 45, 14, 20);
+      }
+    }
+
+    // Helper: Passenger Stick Figure
+    function drawPassengerFigure(x, y, armsUp) {
+      // Head
+      ctx.fillStyle = "#ffcc99";
+      ctx.beginPath();
+      ctx.arc(x, y - 10, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Blue Shirt Body
+      ctx.fillStyle = "#0066cc";
+      ctx.fillRect(x - 4, y - 5, 8, 12);
+
+      // Waving Arms
+      ctx.strokeStyle = "#0066cc";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      if (armsUp) {
+        ctx.moveTo(x - 4, y - 2); ctx.lineTo(x - 9, y - 12);
+        ctx.moveTo(x + 4, y - 2); ctx.lineTo(x + 9, y - 12);
+      } else {
+        ctx.moveTo(x - 4, y - 2); ctx.lineTo(x - 9, y);
+        ctx.moveTo(x + 4, y - 2); ctx.lineTo(x + 9, y);
+      }
+      ctx.stroke();
+
+      // Pants
+      ctx.fillStyle = "#222";
+      ctx.fillRect(x - 4, y + 7, 3, 7);
+      ctx.fillRect(x + 1, y + 7, 3, 7);
+    }
+
+    // Helper: Red "$" Badge
+    function drawDollarBadge(x, y) {
+      ctx.fillStyle = "#cc0000";
+      ctx.beginPath();
+      ctx.arc(x, y, 11, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 13px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("$", x, y + 1);
+    }
+
+    // Helper: 3D-Style Green Compass Arrow
+    function drawGuideArrow(tx, ty) {
+      const angle = Math.atan2(ty - car.y, tx - car.x);
+      const cx = canvas.width / 2;
+      const cy = 60;
+
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angle);
+
+      ctx.fillStyle = "#00ff33";
+      ctx.strokeStyle = "#005500";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(25, 0);
+      ctx.lineTo(-15, -12);
+      ctx.lineTo(-8, 0);
+      ctx.lineTo(-15, 12);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    gameLoop();
   </script>
 </body>
 </html>

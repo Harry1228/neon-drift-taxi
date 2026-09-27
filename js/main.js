@@ -1,4 +1,4 @@
-// MAIN GAME LOOP, 3D SCENE & RETRO AUDIO
+// MAIN GAME LOOP, SUNNY GTA SKY & AUDIO
 class GameApp {
   constructor() {
     this.container = document.getElementById("canvas-container");
@@ -30,30 +30,37 @@ class GameApp {
   }
 
   initThree() {
-    // 1. Scene with Atmospheric Fog
+    // 1. Bright GTA California / Vice City Sky
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x1a1e29);
-    this.scene.fog = new THREE.FogExp2(0x1a1e29, 0.007);
+    this.scene.background = new THREE.Color(0x56b8ff);
+    this.scene.fog = new THREE.Fog(0xd2edff, 160, 480);
 
-    // 2. Camera (Third-Person Chase)
-    this.camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+    // 2. Dynamic Third-Person Chase Camera
+    this.camera = new THREE.PerspectiveCamera(56, window.innerWidth / window.innerHeight, 0.1, 1000);
 
-    // 3. Renderer with Soft Shadows
+    // 3. WebGL Renderer with Crisp Shadows
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.container.appendChild(this.renderer.domElement);
 
-    // 4. Lighting: Sunset Warm Sunlight + Ambient
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
-    this.scene.add(ambientLight);
+    // 4. Vibrant Sunlight & Sky Bounce Light
+    const hemiLight = new THREE.HemisphereLight(0x78c9ff, 0xffe5b4, 0.75);
+    this.scene.add(hemiLight);
 
-    const sun = new THREE.DirectionalLight(0xffeedd, 0.9);
-    sun.position.set(120, 200, 100);
+    const sun = new THREE.DirectionalLight(0xfff5e0, 1.25);
+    sun.position.set(160, 240, 120);
     sun.castShadow = true;
-    sun.shadow.mapSize.width = 1024;
-    sun.shadow.mapSize.height = 1024;
+    sun.shadow.mapSize.width = 2048;
+    sun.shadow.mapSize.height = 2048;
+    sun.shadow.camera.near = 10;
+    sun.shadow.camera.far = 600;
+    const d = 180;
+    sun.shadow.camera.left = -d;
+    sun.shadow.camera.right = d;
+    sun.shadow.camera.top = d;
+    sun.shadow.camera.bottom = -d;
     this.scene.add(sun);
 
     // 5. City and Vehicle
@@ -84,7 +91,7 @@ class GameApp {
     const gain = this.audioCtx.createGain();
     osc.frequency.setValueAtTime(f1, this.audioCtx.currentTime);
     osc.frequency.exponentialRampToValueAtTime(f2, this.audioCtx.currentTime + 0.3);
-    gain.gain.setValueAtTime(0.2, this.audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.22, this.audioCtx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.01, this.audioCtx.currentTime + 0.3);
     osc.connect(gain);
     gain.connect(this.audioCtx.destination);
@@ -99,7 +106,7 @@ class GameApp {
       const gain = this.audioCtx.createGain();
       osc.type = "sawtooth";
       osc.frequency.setValueAtTime(freq, this.audioCtx.currentTime);
-      gain.gain.setValueAtTime(0.12, this.audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.14, this.audioCtx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, this.audioCtx.currentTime + 0.35);
       osc.connect(gain);
       gain.connect(this.audioCtx.destination);
@@ -112,34 +119,40 @@ class GameApp {
     // 3D Passenger Group
     this.passengerGroup = new THREE.Group();
     
-    // Glowing Beacon Ring
-    const beaconGeo = new THREE.RingGeometry(3.5, 4.2, 32);
-    const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff0055, side: THREE.DoubleSide });
+    // Glowing Red Beacon Ring
+    const beaconGeo = new THREE.RingGeometry(3.6, 4.4, 32);
+    const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff0044, side: THREE.DoubleSide });
     this.beaconMesh = new THREE.Mesh(beaconGeo, beaconMat);
     this.beaconMesh.rotation.x = -Math.PI / 2;
-    this.beaconMesh.position.y = 0.05;
+    this.beaconMesh.position.y = 0.08;
     this.passengerGroup.add(this.beaconMesh);
 
     // 3D Passenger Body
     const pGeo = new THREE.CylinderGeometry(0.5, 0.5, 2.2, 8);
-    const pMat = new THREE.MeshStandardMaterial({ color: 0x0066cc });
+    const pMat = new THREE.MeshStandardMaterial({ color: 0x0077ff, roughness: 0.5 });
     const pBody = new THREE.Mesh(pGeo, pMat);
     pBody.position.y = 1.1;
     this.passengerGroup.add(pBody);
 
-    // Spinning 3D Dollar Coin
-    const coinGeo = new THREE.CylinderGeometry(0.9, 0.9, 0.25, 16);
-    const coinMat = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.8, roughness: 0.2 });
+    const headGeo = new THREE.SphereGeometry(0.5, 12, 12);
+    const headMat = new THREE.MeshStandardMaterial({ color: 0xffd1a4 });
+    const pHead = new THREE.Mesh(headGeo, headMat);
+    pHead.position.y = 2.4;
+    this.passengerGroup.add(pHead);
+
+    // Spinning 3D Gold Dollar Coin
+    const coinGeo = new THREE.CylinderGeometry(1.0, 1.0, 0.25, 18);
+    const coinMat = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.85, roughness: 0.2 });
     this.coinMesh = new THREE.Mesh(coinGeo, coinMat);
-    this.coinMesh.position.y = 3.6;
+    this.coinMesh.position.y = 4.0;
     this.coinMesh.rotation.x = Math.PI / 2;
     this.passengerGroup.add(this.coinMesh);
 
     this.scene.add(this.passengerGroup);
 
     // Destination Dropoff Beacon
-    const dropGeo = new THREE.CylinderGeometry(5.0, 5.0, 0.3, 32);
-    const dropMat = new THREE.MeshBasicMaterial({ color: 0x00ff66, transparent: true, opacity: 0.45 });
+    const dropGeo = new THREE.CylinderGeometry(5.2, 5.2, 0.3, 32);
+    const dropMat = new THREE.MeshBasicMaterial({ color: 0x00ff66, transparent: true, opacity: 0.5 });
     this.dropMesh = new THREE.Mesh(dropGeo, dropMat);
     this.dropMesh.visible = false;
     this.scene.add(this.dropMesh);
@@ -210,11 +223,15 @@ class GameApp {
       this.gearD.className = "gear-active"; this.gearR.className = "";
     }
 
-    // 3. Smooth Third-Person Chase Camera
+    // 3. Smooth Third-Person Camera with Speed Zoom
+    const speedRatio = Math.abs(this.taxi.speed) / this.taxi.maxSpeed;
+    const camDist = 17 + speedRatio * 3.5;
+    const camHeight = 8.5 + speedRatio * 1.5;
+
     const camOffset = new THREE.Vector3(
-      -Math.sin(this.taxi.angle) * 18,
-      9.5,
-      -Math.cos(this.taxi.angle) * 18
+      -Math.sin(this.taxi.angle) * camDist,
+      camHeight,
+      -Math.cos(this.taxi.angle) * camDist
     );
     const targetCamPos = this.taxi.position.clone().add(camOffset);
     this.camera.position.lerp(targetCamPos, 0.12);
@@ -228,32 +245,32 @@ class GameApp {
 
     if (!this.hasPassenger && this.passengerGroup.visible) {
       const dist = this.taxi.position.distanceTo(this.passengerPos);
-      if (dist < 6.5 && isStopped) {
+      if (dist < 6.8 && isStopped) {
         this.hasPassenger = true;
         this.passengerGroup.visible = false;
         this.repositionDropoff();
-        this.timeLeft += 20.0;
-        this.currentFare = 75.00;
+        this.timeLeft += 25.0;
+        this.currentFare = 85.00;
         this.fareVal.innerText = "$" + this.currentFare.toFixed(2).padStart(6, "0");
-        this.playChime(500, 800);
+        this.playChime(520, 840);
       }
     }
 
     if (this.hasPassenger && this.dropMesh.visible) {
       const dist = this.taxi.position.distanceTo(this.dropPos);
-      if (dist < 6.8 && isStopped) {
+      if (dist < 7.2 && isStopped) {
         this.hasPassenger = false;
         this.dropMesh.visible = false;
         this.wallet += this.currentFare;
         this.totalVal.innerText = "$" + this.wallet.toFixed(2).padStart(6, "0");
         this.fareVal.innerText = "$000.00";
-        this.playChime(650, 1100);
+        this.playChime(660, 1150);
 
         setTimeout(() => this.repositionPassenger(), 1400);
       }
     }
 
-    // 5. Compass Arrow Angle pointing to destination
+    // 5. Compass Arrow Angle
     const targetPos = this.hasPassenger ? this.dropPos : this.passengerPos;
     if (targetPos) {
       const dx = targetPos.x - this.taxi.position.x;

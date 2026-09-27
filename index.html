@@ -15,8 +15,11 @@
       <div id="timer-sub">TIME LIMIT</div>
     </div>
 
-    <div id="guide-arrow-container">
-      <div id="guide-arrow"></div>
+    <div class="hud-center">
+      <div id="guide-arrow-container">
+        <div id="guide-arrow"></div>
+      </div>
+      <button id="btn-settings-toggle" onclick="openSettings()">⚙️ CONTROLS</button>
     </div>
 
     <div id="meter-box">
@@ -27,7 +30,7 @@
     </div>
   </div>
 
-  <!-- Crazy Stunt Popup Banner -->
+  <!-- Stunt Popup -->
   <div id="stunt-banner">CRAZY JUMP! +$35</div>
 
   <div id="gear-box">
@@ -36,12 +39,37 @@
 
   <div id="canvas-container"></div>
 
-  <!-- Touch Pedals + Nitro Button -->
+  <!-- SETTINGS MODAL -->
+  <div id="settings-modal">
+    <h2>STEERING SETTINGS</h2>
+    <div class="setting-option">
+      <button class="opt-btn active" id="opt-buttons" onclick="setControlMode('buttons')">
+        <span>◀ ▶</span>
+        Buttons
+      </button>
+      <button class="opt-btn" id="opt-wheel" onclick="setControlMode('wheel')">
+        <span>🛞</span>
+        Steering Wheel
+      </button>
+    </div>
+    <button id="btn-close-settings" onclick="closeSettings()">RESUME GAME</button>
+  </div>
+
+  <!-- Mobile Touch Controls -->
   <div class="touch-controls">
-    <div class="btn-group">
+    <!-- Left Side: Arrow Buttons OR Steering Wheel -->
+    <div class="btn-group" id="btn-group-arrows">
       <div class="t-btn" id="btn-left">◀</div>
       <div class="t-btn" id="btn-right">▶</div>
     </div>
+
+    <div id="wheel-wrapper">
+      <div id="wheel">
+        <div id="wheel-center">TAXI</div>
+      </div>
+    </div>
+
+    <!-- Right Side: Pedals + Nitro + Horn -->
     <div class="btn-group">
       <div class="t-btn btn-horn" id="btn-horn">📯</div>
       <div class="t-btn btn-nitro" id="btn-nitro">NOS</div>

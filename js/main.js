@@ -1,69 +1,60 @@
-// MAIN GAME LOOP, SUNNY GTA SKY & AUDIO
+// MAIN GAME LOOP: 3D TRAFFIC, STUNT COMBOS, NITRO & AUDIO
 class GameApp {
   constructor() {
     this.container = document.getElementById("canvas-container");
 
-    // HUD Elements
     this.timerVal = document.getElementById("timer-val");
     this.fareVal = document.getElementById("fare-val");
     this.totalVal = document.getElementById("total-val");
     this.gearD = document.getElementById("gear-d");
     this.gearR = document.getElementById("gear-r");
     this.guideArrow = document.getElementById("guide-arrow");
+    this.stuntBanner = document.getElementById("stunt-banner");
 
-    // Game Economy
-    this.timeLeft = 50.0;
+    this.timeLeft = 60.0;
     this.wallet = 0;
     this.currentFare = 0;
     this.hasPassenger = false;
+    this.stuntCooldown = 0;
 
-    // Inputs
-    this.keys = { left: false, right: false, gas: false, brake: false };
+    this.keys = { left: false, right: false, gas: false, brake: false, nitro: false };
 
     this.initAudio();
     this.initThree();
     this.setupInputs();
     this.spawnEntities();
+    this.spawnTraffic();
 
     this.animate = this.animate.bind(this);
     requestAnimationFrame(this.animate);
   }
 
   initThree() {
-    // 1. Bright GTA California / Vice City Sky
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x56b8ff);
-    this.scene.fog = new THREE.Fog(0xd2edff, 160, 480);
+    this.scene.fog = new THREE.Fog(0xd2edff, 220, 750);
 
-    // 2. Dynamic Third-Person Chase Camera
-    this.camera = new THREE.PerspectiveCamera(56, window.innerWidth / window.innerHeight, 0.1, 1000);
+    this.camera = new THREE.PerspectiveCamera(56, window.innerWidth / window.innerHeight, 0.1, 1500);
 
-    // 3. WebGL Renderer with Crisp Shadows
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.container.appendChild(this.renderer.domElement);
 
-    // 4. Vibrant Sunlight & Sky Bounce Light
-    const hemiLight = new THREE.HemisphereLight(0x78c9ff, 0xffe5b4, 0.75);
+    const hemiLight = new THREE.HemisphereLight(0x78c9ff, 0xffe5b4, 0.8);
     this.scene.add(hemiLight);
 
-    const sun = new THREE.DirectionalLight(0xfff5e0, 1.25);
-    sun.position.set(160, 240, 120);
+    const sun = new THREE.DirectionalLight(0xfff5e0, 1.3);
+    sun.position.set(200, 320, 180);
     sun.castShadow = true;
     sun.shadow.mapSize.width = 2048;
     sun.shadow.mapSize.height = 2048;
-    sun.shadow.camera.near = 10;
-    sun.shadow.camera.far = 600;
-    const d = 180;
-    sun.shadow.camera.left = -d;
-    sun.shadow.camera.right = d;
-    sun.shadow.camera.top = d;
-    sun.shadow.camera.bottom = -d;
+    const d = 260;
+    sun.shadow.camera.left = -d; sun.shadow.camera.right = d;
+    sun.shadow.camera.top = d; sun.shadow.camera.bottom = -d;
     this.scene.add(sun);
 
-    // 5. City and Vehicle
     this.city = new CityBuilder(this.scene);
     this.taxi = new VehicleController(this.scene);
 
@@ -91,7 +82,7 @@ class GameApp {
     const gain = this.audioCtx.createGain();
     osc.frequency.setValueAtTime(f1, this.audioCtx.currentTime);
     osc.frequency.exponentialRampToValueAtTime(f2, this.audioCtx.currentTime + 0.3);
-    gain.gain.setValueAtTime(0.22, this.audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.25, this.audioCtx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.01, this.audioCtx.currentTime + 0.3);
     osc.connect(gain);
     gain.connect(this.audioCtx.destination);
@@ -116,10 +107,8 @@ class GameApp {
   }
 
   spawnEntities() {
-    // 3D Passenger Group
     this.passengerGroup = new THREE.Group();
-    
-    // Glowing Red Beacon Ring
+
     const beaconGeo = new THREE.RingGeometry(3.6, 4.4, 32);
     const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff0044, side: THREE.DoubleSide });
     this.beaconMesh = new THREE.Mesh(beaconGeo, beaconMat);
@@ -127,20 +116,14 @@ class GameApp {
     this.beaconMesh.position.y = 0.08;
     this.passengerGroup.add(this.beaconMesh);
 
-    // 3D Passenger Body
-    const pGeo = new THREE.CylinderGeometry(0.5, 0.5, 2.2, 8);
-    const pMat = new THREE.MeshStandardMaterial({ color: 0x0077ff, roughness: 0.5 });
-    const pBody = new THREE.Mesh(pGeo, pMat);
+    const pBody = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 2.2, 8), new THREE.MeshStandardMaterial({ color: 0x0077ff }));
     pBody.position.y = 1.1;
     this.passengerGroup.add(pBody);
 
-    const headGeo = new THREE.SphereGeometry(0.5, 12, 12);
-    const headMat = new THREE.MeshStandardMaterial({ color: 0xffd1a4 });
-    const pHead = new THREE.Mesh(headGeo, headMat);
+    const pHead = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 12), new THREE.MeshStandardMaterial({ color: 0xffd1a4 }));
     pHead.position.y = 2.4;
     this.passengerGroup.add(pHead);
 
-    // Spinning 3D Gold Dollar Coin
     const coinGeo = new THREE.CylinderGeometry(1.0, 1.0, 0.25, 18);
     const coinMat = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.85, roughness: 0.2 });
     this.coinMesh = new THREE.Mesh(coinGeo, coinMat);
@@ -150,7 +133,6 @@ class GameApp {
 
     this.scene.add(this.passengerGroup);
 
-    // Destination Dropoff Beacon
     const dropGeo = new THREE.CylinderGeometry(5.2, 5.2, 0.3, 32);
     const dropMat = new THREE.MeshBasicMaterial({ color: 0x00ff66, transparent: true, opacity: 0.5 });
     this.dropMesh = new THREE.Mesh(dropGeo, dropMat);
@@ -158,6 +140,60 @@ class GameApp {
     this.scene.add(this.dropMesh);
 
     this.repositionPassenger();
+  }
+
+  spawnTraffic() {
+    this.trafficCars = [];
+    const colors = [0xffffff, 0x111111, 0x0066cc, 0xcc0000, 0x228b22, 0x9932cc];
+
+    // Spawn 8 active civilian traffic cars
+    for (let i = 0; i < 8; i++) {
+      const carGroup = new THREE.Group();
+      const bodyColor = colors[i % colors.length];
+
+      const body = new THREE.Mesh(
+        new THREE.BoxGeometry(3.4, 1.2, 6.2),
+        new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.3 })
+      );
+      body.position.y = 0.9;
+      body.castShadow = true;
+      carGroup.add(body);
+
+      const cab = new THREE.Mesh(
+        new THREE.BoxGeometry(2.8, 0.9, 3.2),
+        new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.1 })
+      );
+      cab.position.set(0, 1.8, -0.2);
+      carGroup.add(cab);
+
+      // Random placement along grid avenues
+      const isVertical = i % 2 === 0;
+      const x = isVertical ? (i - 4) * 205 + 102 : (Math.random() - 0.5) * 600;
+      const z = isVertical ? (Math.random() - 0.5) * 600 : (i - 4) * 205 + 102;
+      carGroup.position.set(x, 0.4, z);
+
+      this.scene.add(carGroup);
+      this.trafficCars.push({
+        mesh: carGroup,
+        isVertical: isVertical,
+        speed: 0.6 + Math.random() * 0.4,
+        dir: Math.random() > 0.5 ? 1 : -1
+      });
+    }
+  }
+
+  showStunt(text, bonus) {
+    if (this.stuntCooldown > 0) return;
+    this.stuntBanner.innerText = `${text} +$${bonus}`;
+    this.stuntBanner.classList.add("show");
+    this.wallet += bonus;
+    this.totalVal.innerText = "$" + this.wallet.toFixed(2).padStart(6, "0");
+    this.playChime(600, 950);
+    this.stuntCooldown = 60; // 1s cooldown
+
+    setTimeout(() => {
+      this.stuntBanner.classList.remove("show");
+    }, 1200);
   }
 
   repositionPassenger() {
@@ -181,6 +217,7 @@ class GameApp {
       if (e.key === "d" || e.key === "ArrowRight") this.keys.right = true;
       if (e.key === "w" || e.key === "ArrowUp") this.keys.gas = true;
       if (e.key === "s" || e.key === "ArrowDown") this.keys.brake = true;
+      if (e.key === "Shift" || e.key.toLowerCase() === "n") this.keys.nitro = true;
       if (e.key === " " || e.key.toLowerCase() === "h") this.playHorn();
     });
     window.addEventListener("keyup", (e) => {
@@ -188,6 +225,7 @@ class GameApp {
       if (e.key === "d" || e.key === "ArrowRight") this.keys.right = false;
       if (e.key === "w" || e.key === "ArrowUp") this.keys.gas = false;
       if (e.key === "s" || e.key === "ArrowDown") this.keys.brake = false;
+      if (e.key === "Shift" || e.key.toLowerCase() === "n") this.keys.nitro = false;
     });
 
     const bind = (id, action) => {
@@ -199,13 +237,13 @@ class GameApp {
     bind("btn-right", "right");
     bind("btn-gas", "gas");
     bind("btn-brake", "brake");
+    bind("btn-nitro", "nitro");
     document.getElementById("btn-horn").addEventListener("touchstart", (e) => {
       e.preventDefault(); this.playHorn();
     });
   }
 
   animate() {
-    // 1. Timer
     if (this.timeLeft > 0) {
       this.timeLeft -= 1 / 60;
       const sec = Math.floor(this.timeLeft);
@@ -213,8 +251,42 @@ class GameApp {
       this.timerVal.innerText = `${sec.toString().padStart(2, "0")}'${ms.toString().padStart(2, "0")}`;
     }
 
-    // 2. Taxi Physics & Movement
-    this.taxi.update(this.keys, this.city.colliders);
+    if (this.stuntCooldown > 0) this.stuntCooldown--;
+
+    // 1. Taxi Physics
+    this.taxi.update(this.keys, this.city.colliders, this.city.ramps);
+
+    // Stunt Jump Trigger
+    if (this.taxi.airTime > 0.55 && this.taxi.isGrounded) {
+      this.showStunt("CRAZY JUMP!", 35);
+      this.taxi.airTime = 0;
+    }
+
+    // 2. Traffic Simulation & Near-Miss Detection
+    for (let t of this.trafficCars) {
+      if (t.isVertical) {
+        t.mesh.position.z += t.speed * t.dir;
+        t.mesh.rotation.y = t.dir === 1 ? 0 : Math.PI;
+        if (t.mesh.position.z > 600) t.mesh.position.z = -600;
+        if (t.mesh.position.z < -600) t.mesh.position.z = 600;
+      } else {
+        t.mesh.position.x += t.speed * t.dir;
+        t.mesh.rotation.y = t.dir === 1 ? Math.PI / 2 : -Math.PI / 2;
+        if (t.mesh.position.x > 600) t.mesh.position.x = -600;
+        if (t.mesh.position.x < -600) t.mesh.position.x = 600;
+      }
+
+      // Proximity to Taxi
+      const dist = this.taxi.position.distanceTo(t.mesh.position);
+      if (dist < 4.2) {
+        // Crash
+        this.taxi.speed = -this.taxi.speed * 0.4;
+        this.showStunt("CRASH! -$10", -10);
+      } else if (dist < 7.2 && this.taxi.speed > 1.8) {
+        // High-Speed Near Miss
+        this.showStunt("NEAR MISS!", 20);
+      }
+    }
 
     // Gear Indicator
     if (this.taxi.speed < -0.05) {
@@ -223,7 +295,11 @@ class GameApp {
       this.gearD.className = "gear-active"; this.gearR.className = "";
     }
 
-    // 3. Smooth Third-Person Camera with Speed Zoom
+    // 3. Dynamic Camera (Nitro Speed FOV Warp)
+    const targetFOV = this.taxi.isNitro ? 66 : 56;
+    this.camera.fov += (targetFOV - this.camera.fov) * 0.1;
+    this.camera.updateProjectionMatrix();
+
     const speedRatio = Math.abs(this.taxi.speed) / this.taxi.maxSpeed;
     const camDist = 17 + speedRatio * 3.5;
     const camHeight = 8.5 + speedRatio * 1.5;
@@ -239,7 +315,7 @@ class GameApp {
     const lookTarget = this.taxi.position.clone().add(new THREE.Vector3(0, 1.8, 0));
     this.camera.lookAt(lookTarget);
 
-    // 4. Passenger Pickup / Dropoff Logic
+    // 4. Passenger Pickup / Dropoff
     const isStopped = Math.abs(this.taxi.speed) < 0.15;
     this.coinMesh.rotation.y += 0.05;
 
@@ -250,7 +326,7 @@ class GameApp {
         this.passengerGroup.visible = false;
         this.repositionDropoff();
         this.timeLeft += 25.0;
-        this.currentFare = 85.00;
+        this.currentFare = 90.00;
         this.fareVal.innerText = "$" + this.currentFare.toFixed(2).padStart(6, "0");
         this.playChime(520, 840);
       }

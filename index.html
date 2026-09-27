@@ -110,12 +110,12 @@
     const gearD = document.getElementById("gear-d");
     const gearR = document.getElementById("gear-r");
 
-    // CITY GRID ARCHITECTURE
-    const BLOCK_W = 600;      // Size of one city block
+    // CITY GRID DIMENSIONS
+    const BLOCK_W = 600;
     const BLOCK_H = 600;
-    const ROAD_W = 220;       // Width of streets
-    const SIDEWALK_W = 65;    // Checkered sidewalk border
-    const CELL_W = BLOCK_W + ROAD_W; // 820px full repeating cell
+    const ROAD_W = 220;
+    const SIDEWALK_W = 65;    // Accessible footpath (65px wide on all sides)
+    const CELL_W = BLOCK_W + ROAD_W;
     const CELL_H = BLOCK_H + ROAD_W;
     const GRID_COLS = 5;
     const GRID_ROWS = 5;
@@ -149,6 +149,35 @@
       osc.stop(audioCtx.currentTime + duration);
     }
 
+    function playCrashThud() {
+      if (!audioCtx) return;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(130, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(25, audioCtx.currentTime + 0.16);
+      gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.16);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.16);
+    }
+
+    // Spark Particles for building impacts
+    const sparks = [];
+    function createSparks(x, y) {
+      for (let i = 0; i < 9; i++) {
+        sparks.push({
+          x: x, y: y,
+          vx: (Math.random() - 0.5) * 7,
+          vy: (Math.random() - 0.5) * 7,
+          life: 1.0,
+          color: Math.random() > 0.4 ? "#ffdd00" : "#ff3300"
+        });
+      }
+    }
+
     // Game Variables
     let totalScore = 0;
     let currentFare = 0;
@@ -156,20 +185,21 @@
     let hasPassenger = false;
     let waveTick = 0;
 
-    // Start car inside a street lane next to the sidewalk
+    // Taxi Player
     const car = {
       x: CELL_W * 1.5 + ROAD_W / 4,
       y: CELL_H * 1.5 + ROAD_W / 2,
       speed: 0, angle: -Math.PI / 2,
+      radius: 17, // Collision radius for taxi bumper
       maxSpeed: 7.2, accel: 0.28, friction: 0.94, turnSpeed: 0.072
     };
 
     const camera = { x: 0, y: 0 };
 
-    // Sidewalk customer spawn
+    // Passenger initially on the sidewalk corner
     let customer = {
-      x: CELL_W * 1 + ROAD_W + SIDEWALK_W / 2 + 10,
-      y: CELL_H * 1 + ROAD_W + 40,
+      x: CELL_W * 1 + ROAD_W + 32,
+      y: CELL_H * 1 + ROAD_W + 32,
       r: 48, active: true
     };
     let dropoff = { x: 0, y: 0, r: 52, active: false };
@@ -204,16 +234,78 @@
       return num.toFixed(2).padStart(6, "0");
     }
 
-    // Pick a sidewalk corner in the city for passenger / destination
+    // Pick random destination on sidewalk/footpath (always accessible)
     function getRandomSidewalkSpot() {
       const col = Math.floor(Math.random() * (GRID_COLS - 1));
       const row = Math.floor(Math.random() * (GRID_ROWS - 1));
       const bx = col * CELL_W + ROAD_W;
       const by = row * CELL_H + ROAD_W;
-      // Put them on the perimeter sidewalk corner
-      const onX = Math.random() > 0.5 ? bx + 30 : bx + BLOCK_W - 30;
-      const onY = Math.random() > 0.5 ? by + 30 : by + BLOCK_H - 30;
-      return { x: onX, y: onY };
+
+      const corner = Math.floor(Math.random() * 4);
+      let sx = bx + 32, sy = by + 32;
+      if (corner === 1) { sx = bx + BLOCK_W - 32; sy = by + 32; }
+      else if (corner === 2) { sx = bx + 32; sy = by + BLOCK_H - 32; }
+      else if (corner === 3) { sx = bx + BLOCK_W - 32; sy = by + BLOCK_H - 32; }
+
+      return { x: sx, y: sy };
+    }
+
+    // RESOLVE BUILDING COLLISION
+    // Roads & Footpaths (sidewalks) are walkable/drivable. Only the central building core is solid!
+    function resolveBuildingCollisions() {
+      const cMin = Math.max(0, Math.floor((car.x - 120) / CELL_W));
+      const cMax = Math.min(GRID_COLS - 1, Math.floor((car.x + 120) / CELL_W));
+      const rMin = Math.max(0, Math.floor((car.y - 120) / CELL_H));
+      const rMax = Math.min(GRID_ROWS - 1, Math.floor((car.y + 120) / CELL_H));
+
+      for (let c = cMin; c <= cMax; c++) {
+        for (let r = rMin; r <= rMax; r++) {
+          const bx = c * CELL_W + ROAD_W;
+          const by = r * CELL_H + ROAD_W;
+          // The building sits inside the block, recessed by the sidewalk footpath
+          const bX = bx + SIDEWALK_W;
+          const bY = by + SIDEWALK_W;
+          const bW = BLOCK_W - SIDEWALK_W * 2;
+          const bH = BLOCK_H - SIDEWALK_W * 2;
+
+          // Find closest point on building rectangle to car bumper
+          const closestX = Math.max(bX, Math.min(car.x, bX + bW));
+          const closestY = Math.max(bY, Math.min(car.y, bY + bH));
+          let dx = car.x - closestX;
+          let dy = car.y - closestY;
+          let distSq = dx * dx + dy * dy;
+
+          if (distSq < car.radius * car.radius) {
+            let dist = Math.sqrt(distSq);
+
+            // Handle car deeply trapped inside building wall
+            if (dist === 0) {
+              const dLeft = car.x - bX;
+              const dRight = (bX + bW) - car.x;
+              const dTop = car.y - bY;
+              const dBottom = (bY + bH) - car.y;
+              const minD = Math.min(dLeft, dRight, dTop, dBottom);
+              if (minD === dLeft) dx = -1;
+              else if (minD === dRight) dx = 1;
+              else if (minD === dTop) dy = -1;
+              else dy = 1;
+              dist = 1;
+            }
+
+            // Push car out of the building back onto the sidewalk
+            const overlap = car.radius - dist;
+            car.x += (dx / dist) * overlap;
+            car.y += (dy / dist) * overlap;
+
+            // Audio & visual collision impact
+            if (Math.abs(car.speed) > 1.2) {
+              playCrashThud();
+              createSparks(closestX, closestY);
+            }
+            car.speed = -car.speed * 0.3; // Rebound bounce
+          }
+        }
+      }
     }
 
     function gameLoop() {
@@ -227,7 +319,7 @@
         timerVal.innerText = "00'00";
       }
 
-      // 2. Taxi Physics
+      // 2. Car Dynamics
       if (Math.abs(car.speed) > 0.4) {
         const dir = car.speed >= 0 ? 1 : -1;
         if (keys.left) car.angle -= car.turnSpeed * dir;
@@ -242,19 +334,23 @@
         car.speed *= car.friction;
       }
 
-      // Update Gear UI
+      // Gear HUD
       if (car.speed < -0.2) {
         gearD.className = ""; gearR.className = "gear-active";
       } else {
         gearD.className = "gear-active"; gearR.className = "";
       }
 
+      // Move car
       car.x += Math.cos(car.angle) * car.speed;
       car.y += Math.sin(car.angle) * car.speed;
 
-      // Wrap around or clamp within world bounds
-      car.x = Math.max(50, Math.min(WORLD_W - 50, car.x));
-      car.y = Math.max(50, Math.min(WORLD_H - 50, car.y));
+      // Solid Building Collision (blocks buildings, leaves road & sidewalk open)
+      resolveBuildingCollisions();
+
+      // Screen/World boundaries
+      car.x = Math.max(40, Math.min(WORLD_W - 40, car.x));
+      car.y = Math.max(40, Math.min(WORLD_H - 40, car.y));
 
       // Camera Centering
       camera.x = car.x - canvas.width / 2;
@@ -274,7 +370,7 @@
           dropoff.y = spot.y;
           dropoff.active = true;
           timeLeft += 20.0;
-          currentFare = 55.00;
+          currentFare = 60.00;
           fareVal.innerText = "$" + formatNumber(currentFare);
           playBeep(520, "triangle", 0.2);
           playBeep(780, "sine", 0.3);
@@ -303,44 +399,41 @@
         }
       }
 
-      // 5. RENDER THE CITY
+      // 5. RENDER CITY
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.save();
       ctx.translate(-camera.x, -camera.y);
 
-      // BASE ROAD: Light textured grey asphalt
+      // BASE ROAD: Light textured asphalt
       ctx.fillStyle = "#9c9c9c";
       ctx.fillRect(camera.x, camera.y, canvas.width, canvas.height);
 
-      // Draw all visible city blocks
       for (let c = 0; c < GRID_COLS; c++) {
         for (let r = 0; r < GRID_ROWS; r++) {
           const bx = c * CELL_W + ROAD_W;
           const by = r * CELL_H + ROAD_W;
 
-          // Frustum culling: Only draw if inside camera view
           if (bx + BLOCK_W < camera.x - 100 || bx > camera.x + canvas.width + 100 ||
               by + BLOCK_H < camera.y - 100 || by > camera.y + canvas.height + 100) {
             continue;
           }
 
-          // A. Road Lane Markings (White dashed lines in the middle of roads)
+          // A. Road Markings
           drawRoadMarkings(c * CELL_W, r * CELL_H);
 
-          // B. Sidewalk with terracotta curb & checkered tiles
+          // B. Footpath / Sidewalk (drivable surface)
           drawSidewalkBlock(bx, by, BLOCK_W, BLOCK_H);
 
-          // C. Red Brick Buildings
+          // C. Red Brick Building (solid obstacle)
           drawRedBuilding(bx + SIDEWALK_W, by + SIDEWALK_W, BLOCK_W - SIDEWALK_W * 2, BLOCK_H - SIDEWALK_W * 2);
 
-          // D. Sidewalk Props (Telephone booth, Street lamps, Flowerbeds)
+          // D. Sidewalk Props
           drawStreetProps(bx, by);
         }
       }
 
-      // 6. Draw Customer
+      // 6. Draw Customer on Footpath
       if (customer.active) {
-        // Red Pulsing Ring
         const pulse = Math.sin(waveTick * 2) * 5;
         ctx.strokeStyle = "#e60000";
         ctx.lineWidth = 3.5;
@@ -352,7 +445,7 @@
         drawRedDollarCoin(customer.x, customer.y - 36 + Math.sin(waveTick * 3) * 6);
       }
 
-      // 7. Draw Dropoff Target
+      // 7. Draw Destination Target
       if (dropoff.active) {
         ctx.fillStyle = "rgba(0, 255, 100, 0.25)";
         ctx.strokeStyle = "#00ff66";
@@ -366,7 +459,23 @@
         ctx.fillText("STOP HERE", dropoff.x - 35, dropoff.y + 6);
       }
 
-      // 8. Draw Player: CRAZY TAXI YELLOW CONVERTIBLE
+      // 8. Draw Sparks from building collisions
+      for (let i = sparks.length - 1; i >= 0; i--) {
+        const s = sparks[i];
+        s.x += s.vx;
+        s.y += s.vy;
+        s.life -= 0.06;
+        if (s.life <= 0) {
+          sparks.splice(i, 1);
+          continue;
+        }
+        ctx.fillStyle = s.color;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, 3 * s.life, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 9. Draw Taxi
       ctx.save();
       ctx.translate(car.x, car.y);
       ctx.rotate(car.angle);
@@ -382,15 +491,15 @@
       ctx.fillRect(-18, 11, 10, 5);
       ctx.fillRect(10, 11, 10, 5);
 
-      // Bright Yellow Car Body
+      // Yellow Car Body
       ctx.fillStyle = "#ffcc00";
       ctx.fillRect(-24, -13, 48, 26);
 
-      // Red Seats / Interior
+      // Red Seats
       ctx.fillStyle = "#cc0000";
       ctx.fillRect(-10, -9, 18, 18);
 
-      // Driver (Blonde hair/cap)
+      // Driver
       ctx.fillStyle = "#ffeb3b";
       ctx.beginPath(); ctx.arc(-2, 0, 4.5, 0, Math.PI * 2); ctx.fill();
 
@@ -398,14 +507,14 @@
       ctx.fillStyle = "#cceeff";
       ctx.fillRect(8, -10, 4, 20);
 
-      // Rear Taxi Fins & Decal
+      // Decal
       ctx.fillStyle = "#000";
       ctx.fillRect(-22, -13, 3, 26);
 
       ctx.restore();
       ctx.restore(); // Restore camera offset
 
-      // 9. SCREEN-SPACE HUD: Crazy Taxi Guide Arrow
+      // 10. SCREEN-SPACE HUD: Crazy Taxi Guide Arrow
       const target = hasPassenger ? dropoff : customer;
       if (target.active) {
         drawGuideArrow(target.x, target.y);
@@ -416,21 +525,20 @@
 
     // --- ART BUILDERS ---
 
-    // 1. Sidewalk with terracotta curbs and checkered tile pattern
     function drawSidewalkBlock(x, y, w, h) {
       // Curb Drop Shadow
       ctx.fillStyle = "#7a7a7a";
       ctx.fillRect(x - 6, y - 6, w + 12, h + 12);
 
-      // Terracotta Pinkish-Red Curb Rim
+      // Terracotta Curb Rim
       ctx.fillStyle = "#d58977";
       ctx.fillRect(x - 4, y - 4, w + 8, h + 8);
 
-      // Checkered Sidewalk Slab
+      // Checkered Sidewalk Surface (Footpath)
       ctx.fillStyle = "#eae5dc";
       ctx.fillRect(x, y, w, h);
 
-      // Checkered Tile Lines
+      // Checkered Grid
       ctx.strokeStyle = "#d6cfc2";
       ctx.lineWidth = 1;
       const tSize = 16;
@@ -441,8 +549,8 @@
         ctx.beginPath(); ctx.moveTo(x, ty); ctx.lineTo(x + w, ty); ctx.stroke();
       }
 
-      // Beveled Chamfered Corner Curbs
-      ctx.fillStyle = "#9c9c9c"; // Cut corners to show street asphalt
+      // Cut 45-degree corner angles to display street below
+      ctx.fillStyle = "#9c9c9c";
       ctx.beginPath();
       ctx.moveTo(x - 5, y - 5); ctx.lineTo(x + 22, y - 5); ctx.lineTo(x - 5, y + 22); ctx.fill();
       ctx.beginPath();
@@ -452,7 +560,7 @@
       ctx.beginPath();
       ctx.moveTo(x + w + 5, y + h + 5); ctx.lineTo(x + w - 22, y + h + 5); ctx.lineTo(x + w + 5, y + h - 22); ctx.fill();
 
-      // Draw angled terracotta border along chamfers
+      // Curb border line
       ctx.strokeStyle = "#d58977";
       ctx.lineWidth = 4;
       ctx.beginPath();
@@ -463,15 +571,19 @@
       ctx.stroke();
     }
 
-    // 2. Red Brick Building with Blue Glass Windows
     function drawRedBuilding(x, y, w, h) {
+      // Building drop shadow on sidewalk
+      ctx.fillStyle = "rgba(0,0,0,0.2)";
+      ctx.fillRect(x + 8, y + 8, w, h);
+
+      // Red Brick Facade
       ctx.fillStyle = "#c92a2a";
       ctx.fillRect(x, y, w, h);
       ctx.strokeStyle = "#8f1d1d";
       ctx.lineWidth = 3;
       ctx.strokeRect(x, y, w, h);
 
-      // Blue Windows Grid
+      // Windows
       ctx.fillStyle = "#5dade2";
       const winW = 18;
       const winH = 26;
@@ -479,32 +591,28 @@
         for (let wy = y + 16; wy < y + h - 25; wy += 38) {
           ctx.fillRect(wx, wy, winW, winH);
           ctx.fillStyle = "rgba(255,255,255,0.45)";
-          ctx.fillRect(wx + 2, wy + 2, 4, winH - 4); // Window reflection
+          ctx.fillRect(wx + 2, wy + 2, 4, winH - 4);
           ctx.fillStyle = "#5dade2";
         }
       }
     }
 
-    // 3. Street Markings: STOP text & lane dividers
     function drawRoadMarkings(rx, ry) {
       ctx.strokeStyle = "#ffffff";
       ctx.lineWidth = 4;
       ctx.setLineDash([20, 20]);
 
-      // Horizontal lane dash
       ctx.beginPath();
       ctx.moveTo(rx, ry + ROAD_W / 2);
       ctx.lineTo(rx + CELL_W, ry + ROAD_W / 2);
       ctx.stroke();
 
-      // Vertical lane dash
       ctx.beginPath();
       ctx.moveTo(rx + ROAD_W / 2, ry);
       ctx.lineTo(rx + ROAD_W / 2, ry + CELL_H);
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Painted "STOP" on street before crosswalk
       ctx.fillStyle = "rgba(255,255,255,0.7)";
       ctx.font = "bold 20px Arial";
       ctx.save();
@@ -514,9 +622,7 @@
       ctx.restore();
     }
 
-    // 4. Sidewalk Props: Red Phone Booth & Green Street Lamp
     function drawStreetProps(bx, by) {
-      // Red Telephone Booth
       const px = bx + 28;
       const py = by + 28;
       ctx.fillStyle = "#d90429";
@@ -524,22 +630,20 @@
       ctx.fillStyle = "#bde0fe";
       ctx.fillRect(px + 3, py + 3, 14, 22);
       ctx.fillStyle = "#d90429";
-      ctx.fillRect(px + 8, py + 3, 4, 22); // Booth frame
+      ctx.fillRect(px + 8, py + 3, 4, 22);
 
-      // Vintage Green Streetlamp with Flowerbed Base
       const lx = bx + BLOCK_W - 32;
       const ly = by + 32;
-      // Flowerbed round base
       ctx.fillStyle = "#588157";
       ctx.beginPath(); ctx.arc(lx, ly, 14, 0, Math.PI * 2); ctx.fill();
-      // Flower blossoms (yellow & red dots)
+
       ctx.fillStyle = "#ff0055";
       ctx.fillRect(lx - 8, ly - 4, 3, 3);
       ctx.fillRect(lx + 6, ly + 2, 3, 3);
       ctx.fillStyle = "#ffcc00";
       ctx.fillRect(lx - 2, ly + 6, 3, 3);
       ctx.fillRect(lx + 4, ly - 6, 3, 3);
-      // Green Lamp Post & Head
+
       ctx.fillStyle = "#2d6a4f";
       ctx.beginPath(); ctx.arc(lx, ly, 5, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = "#2d6a4f";
@@ -547,15 +651,11 @@
       ctx.strokeRect(lx - 6, ly - 6, 12, 12);
     }
 
-    // 5. Waving Passenger Figure
     function drawWavingCustomer(x, y, armsUp) {
-      // Head
       ctx.fillStyle = "#ffcc99";
       ctx.beginPath(); ctx.arc(x, y - 10, 5.5, 0, Math.PI * 2); ctx.fill();
-      // Blue Shirt
       ctx.fillStyle = "#0066cc";
       ctx.fillRect(x - 5, y - 4, 10, 13);
-      // Waving Arms
       ctx.strokeStyle = "#0066cc";
       ctx.lineWidth = 3.5;
       ctx.beginPath();
@@ -567,13 +667,11 @@
         ctx.moveTo(x + 5, y - 1); ctx.lineTo(x + 11, y + 2);
       }
       ctx.stroke();
-      // Pants
       ctx.fillStyle = "#2b2d42";
       ctx.fillRect(x - 4, y + 9, 3, 7);
       ctx.fillRect(x + 1, y + 9, 3, 7);
     }
 
-    // 6. Floating Red "$" Coin Badge
     function drawRedDollarCoin(x, y) {
       ctx.fillStyle = "#cc0000";
       ctx.beginPath(); ctx.arc(x, y, 13, 0, Math.PI * 2); ctx.fill();
@@ -584,7 +682,6 @@
       ctx.fillText("$", x, y + 1);
     }
 
-    // 7. Crazy Taxi Compass Arrow
     function drawGuideArrow(tx, ty) {
       const angle = Math.atan2(ty - car.y, tx - car.x);
       const cx = canvas.width / 2;

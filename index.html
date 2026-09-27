@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Crazy Taxi 3D: Massive Open World</title>
+  <title>Crazy Taxi 3D: Open World Stunt City</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
     body {
@@ -83,7 +83,7 @@
     }
     .gear-active { background: #ff2200; color: #fff; padding: 2px 5px; border-radius: 4px; }
 
-    /* Touch Controls */
+    /* Mobile Controls: Left Pedals & Right Steering */
     .touch-controls {
       position: absolute; bottom: 16px; left: 0; right: 0;
       display: flex; justify-content: space-between; padding: 0 16px;
@@ -91,7 +91,7 @@
     }
     .btn-group { display: flex; gap: 8px; pointer-events: auto; align-items: flex-end; }
     .t-btn {
-      width: 60px; height: 60px; border-radius: 50%; border: 3px solid #ffcc00;
+      width: 62px; height: 62px; border-radius: 50%; border: 3px solid #ffcc00;
       background: rgba(0, 0, 0, 0.75); color: #fff; font-size: 22px; font-weight: bold;
       display: flex; align-items: center; justify-content: center; touch-action: none;
       box-shadow: 0 4px 10px rgba(0,0,0,0.6); backdrop-filter: blur(4px);
@@ -105,7 +105,7 @@
     }
     .btn-horn { background: rgba(240, 150, 0, 0.75); border-color: #ffaa00; width: 48px; height: 48px; font-size: 16px; }
 
-    /* Right-Hand Steering Wheel */
+    /* Right-Hand Rotary Steering Wheel */
     #wheel-wrapper {
       pointer-events: auto; position: relative; width: 125px; height: 125px;
       display: block; touch-action: none;
@@ -133,7 +133,7 @@
       font-size: 14px; color: #111; font-weight: 900; z-index: 2;
     }
 
-    /* Modals (Controls & Garage) */
+    /* Modals */
     .game-modal {
       position: absolute; inset: 0; background: rgba(10, 15, 25, 0.94);
       display: none; flex-direction: column; align-items: center; justify-content: center;
@@ -192,7 +192,7 @@
 
   <div id="canvas-container"></div>
 
-  <!-- CONTROLS SETTINGS MODAL -->
+  <!-- CONTROLS MODAL -->
   <div class="game-modal" id="settings-modal">
     <h2>STEERING SETTINGS</h2>
     <div class="setting-option">
@@ -206,7 +206,7 @@
     <button class="modal-close-btn" onclick="closeSettings()">RESUME</button>
   </div>
 
-  <!-- VEHICLE GARAGE MODAL -->
+  <!-- GARAGE MODAL -->
   <div class="game-modal" id="garage-modal">
     <h2>SELECT VEHICLE</h2>
     <button class="v-btn" onclick="selectVehicle('taxi')">🚖 CRAZY CAB</button>
@@ -238,7 +238,6 @@
     </div>
   </div>
 
-  <!-- Three.js CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
   <script>
@@ -247,7 +246,7 @@
       constructor(scene) {
         this.scene = scene;
         this.particles = [];
-        this.smokeGeo = new THREE.PlaneGeometry(1.8, 1.8);
+        this.smokeGeo = new THREE.PlaneGeometry(1.6, 1.6);
         this.smokeMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6, depthWrite: false });
         this.sparkGeo = new THREE.PlaneGeometry(0.3, 0.3);
       }
@@ -262,14 +261,14 @@
       }
 
       spawnSparks(x, y, z) {
-        for (let i = 0; i < 5; i++) {
-          const mat = new THREE.MeshBasicMaterial({ color: Math.random() > 0.5 ? 0xffcc00 : 0xff3300, transparent: true });
+        for (let i = 0; i < 4; i++) {
+          const mat = new THREE.MeshBasicMaterial({ color: Math.random() > 0.5 ? 0xffcc00 : 0xff3300 });
           const p = new THREE.Mesh(this.sparkGeo, mat);
           p.position.set(x, y + Math.random(), z);
           this.scene.add(p);
           this.particles.push({
             mesh: p, life: 1.0, type: 'spark',
-            vx: (Math.random() - 0.5) * 0.8, vy: Math.random() * 0.5, vz: (Math.random() - 0.5) * 0.8
+            vx: (Math.random() - 0.5) * 0.7, vy: Math.random() * 0.4, vz: (Math.random() - 0.5) * 0.7
           });
         }
       }
@@ -277,29 +276,28 @@
       update() {
         for (let i = this.particles.length - 1; i >= 0; i--) {
           let p = this.particles[i];
-          p.life -= 0.035;
+          p.life -= 0.04;
           if (p.life <= 0) {
             this.scene.remove(p.mesh);
             p.mesh.material.dispose();
             this.particles.splice(i, 1);
           } else {
             if (p.type === 'smoke') {
-              p.mesh.scale.setScalar(1 + (1 - p.life) * 2.2);
+              p.mesh.scale.setScalar(1 + (1 - p.life) * 2.0);
               p.mesh.material.opacity = p.life * 0.5;
-              p.mesh.position.y += 0.04;
+              p.mesh.position.y += 0.03;
             } else {
               p.mesh.position.x += p.vx;
               p.mesh.position.y += p.vy;
               p.mesh.position.z += p.vz;
-              p.vy -= 0.04;
-              p.mesh.material.opacity = p.life;
+              p.vy -= 0.03;
             }
           }
         }
       }
     }
 
-    // --- 2. 3D CITY BUILDER ---
+    // --- 2. 3D CITY BUILDER (LIGHTWEIGHT MOBILE MATERIALS) ---
     class CityBuilder {
       constructor(scene) {
         this.scene = scene;
@@ -310,56 +308,64 @@
       }
 
       buildWorld() {
-        // Ground
-        const groundGeo = new THREE.PlaneGeometry(2400, 2400);
-        const groundMat = new THREE.MeshStandardMaterial({ color: 0x272b34, roughness: 0.9 });
-        const ground = new THREE.Mesh(groundGeo, groundMat);
+        // Dark Asphalt Ground
+        const ground = new THREE.Mesh(
+          new THREE.PlaneGeometry(2400, 2400),
+          new THREE.MeshLambertMaterial({ color: 0x2b2f38 })
+        );
         ground.rotation.x = -Math.PI / 2;
-        ground.receiveShadow = true;
         this.scene.add(ground);
 
-        // Beach & Ocean
-        const sand = new THREE.Mesh(new THREE.PlaneGeometry(300, 2400), new THREE.MeshStandardMaterial({ color: 0xf4d06f, roughness: 0.95 }));
-        sand.rotation.x = -Math.PI / 2; sand.position.set(520, 0.1, 0);
+        // Golden Beach Coastline
+        const sand = new THREE.Mesh(
+          new THREE.PlaneGeometry(300, 2400),
+          new THREE.MeshLambertMaterial({ color: 0xf4d06f })
+        );
+        sand.rotation.x = -Math.PI / 2;
+        sand.position.set(520, 0.1, 0);
         this.scene.add(sand);
 
-        const ocean = new THREE.Mesh(new THREE.PlaneGeometry(1200, 2400), new THREE.MeshStandardMaterial({ color: 0x0077b6, roughness: 0.2 }));
-        ocean.rotation.x = -Math.PI / 2; ocean.position.set(1270, 0.05, 0);
+        // Ocean Waters
+        const ocean = new THREE.Mesh(
+          new THREE.PlaneGeometry(1200, 2400),
+          new THREE.MeshLambertMaterial({ color: 0x0077b6 })
+        );
+        ocean.rotation.x = -Math.PI / 2;
+        ocean.position.set(1270, 0.05, 0);
         this.scene.add(ocean);
         this.colliders.push({ minX: 680, maxX: 2000, minZ: -1200, maxZ: 1200 });
 
-        // City Blocks (6x6)
-        const blockSize = 140, roadWidth = 65, cellSize = 205, halfGrid = 3;
+        // City Blocks (4x4 major layout)
+        const blockSize = 140, roadWidth = 65, cellSize = 205, halfGrid = 2;
         for (let x = -halfGrid; x < halfGrid; x++) {
           for (let z = -halfGrid; z < halfGrid; z++) {
-            if (x === halfGrid - 1) continue;
             this.buildBlock(x * cellSize + cellSize / 2, z * cellSize + cellSize / 2, blockSize, x, z);
           }
         }
 
         // Stunt Ramps
-        this.addStuntRamp(-100, 5, 102, 0);
-        this.addStuntRamp(105, 5, -100, Math.PI / 2);
-        this.addStuntRamp(-305, 5, -100, 0);
-        this.addStuntRamp(310, 5, 102, -Math.PI / 2);
+        this.addStuntRamp(-100, 4, 102, 0);
+        this.addStuntRamp(105, 4, -100, Math.PI / 2);
+        this.addStuntRamp(-305, 4, -100, 0);
+        this.addStuntRamp(310, 4, 102, -Math.PI / 2);
 
-        // Road Dividers
+        // Road Lane Dividers
         this.buildRoadLines(cellSize, halfGrid);
       }
 
       buildBlock(cx, cz, size, gx, gz) {
-        const sidewalkH = 0.9;
+        const sidewalkH = 0.8;
         const sidewalk = new THREE.Mesh(
           new THREE.BoxGeometry(size, sidewalkH, size),
-          new THREE.MeshStandardMaterial({ color: 0xdfd9cd, roughness: 0.9 })
+          new THREE.MeshLambertMaterial({ color: 0xded8cc })
         );
         sidewalk.position.set(cx, sidewalkH / 2, cz);
-        sidewalk.receiveShadow = true;
         this.scene.add(sidewalk);
 
+        // Terracotta Curb Border
         const curb = new THREE.Mesh(
-          new THREE.BoxGeometry(size + 1.2, 0.4, size + 1.2),
-          new THREE.MeshStandardMaterial({ color: 0xc46951, roughness: 0.85 })
+          new THREE.BoxGeometry(size + 1.2, 0.35, size + 1.2),
+          new THREE.MeshLambertMaterial({ color: 0xc46951 })
         );
         curb.position.set(cx, 0.2, cz);
         this.scene.add(curb);
@@ -377,30 +383,29 @@
 
         const bSize = size - 30;
 
-        // Central Park
+        // Central Park with Pond
         if (gx === 0 && gz === 0) {
-          const grass = new THREE.Mesh(new THREE.BoxGeometry(bSize, 0.5, bSize), new THREE.MeshStandardMaterial({ color: 0x4f772d }));
-          grass.position.set(cx, sidewalkH + 0.25, cz);
-          const pond = new THREE.Mesh(new THREE.CylinderGeometry(28, 28, 0.6, 20), new THREE.MeshStandardMaterial({ color: 0x00b4d8 }));
-          pond.position.set(cx, sidewalkH + 0.35, cz);
+          const grass = new THREE.Mesh(new THREE.BoxGeometry(bSize, 0.4, bSize), new THREE.MeshLambertMaterial({ color: 0x4f772d }));
+          grass.position.set(cx, sidewalkH + 0.2, cz);
+          const pond = new THREE.Mesh(new THREE.CylinderGeometry(28, 28, 0.5, 18), new THREE.MeshLambertMaterial({ color: 0x00b4d8 }));
+          pond.position.set(cx, sidewalkH + 0.3, cz);
           this.scene.add(grass, pond);
           return;
         }
 
-        // Buildings
-        const bHeight = 45 + Math.random() * 95;
+        // GTA Colorful Buildings
+        const bHeight = 45 + Math.random() * 85;
         const colors = [0xc83a3a, 0x1d3557, 0x2b2d42, 0x8a4b38, 0x3d5a80, 0xd4a373];
         const building = new THREE.Mesh(
           new THREE.BoxGeometry(bSize, bHeight, bSize),
-          new THREE.MeshStandardMaterial({ color: colors[Math.floor(Math.random() * colors.length)], roughness: 0.5 })
+          new THREE.MeshLambertMaterial({ color: colors[Math.floor(Math.random() * colors.length)] })
         );
         building.position.set(cx, bHeight / 2 + sidewalkH, cz);
-        building.castShadow = true; building.receiveShadow = true;
         this.scene.add(building);
 
-        // Helipad
+        // Helipad / Roof Feature
         if (Math.random() > 0.5) {
-          const pad = new THREE.Mesh(new THREE.CylinderGeometry(15, 15, 0.8, 18), new THREE.MeshStandardMaterial({ color: 0xffcc00 }));
+          const pad = new THREE.Mesh(new THREE.CylinderGeometry(15, 15, 0.8, 16), new THREE.MeshLambertMaterial({ color: 0xffcc00 }));
           pad.position.set(cx, bHeight + sidewalkH + 0.4, cz);
           this.scene.add(pad);
         }
@@ -410,15 +415,17 @@
 
       addPalmTree(x, z) {
         const palm = new THREE.Group();
-        palm.position.set(x, 0.9, z);
-        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.2, 14, 8), new THREE.MeshStandardMaterial({ color: 0x7a5033 }));
-        trunk.position.y = 7; trunk.castShadow = true;
+        palm.position.set(x, 0.8, z);
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.2, 14, 7), new THREE.MeshLambertMaterial({ color: 0x7a5033 }));
+        trunk.position.y = 7;
         palm.add(trunk);
 
-        const frondMat = new THREE.MeshStandardMaterial({ color: 0x2e8b57, side: THREE.DoubleSide });
+        const frondMat = new THREE.MeshLambertMaterial({ color: 0x2e8b57 });
         for (let i = 0; i < 5; i++) {
           const frond = new THREE.Mesh(new THREE.ConeGeometry(5, 10, 4), frondMat);
-          frond.position.set(0, 14, 0); frond.rotation.y = (i * Math.PI) / 2.5; frond.rotation.z = Math.PI / 3;
+          frond.position.set(0, 14, 0);
+          frond.rotation.y = (i * Math.PI) / 2.5;
+          frond.rotation.z = Math.PI / 3;
           palm.add(frond);
         }
         this.scene.add(palm);
@@ -429,7 +436,7 @@
         rampGroup.position.set(x, y, z);
         rampGroup.rotation.y = rotationY;
 
-        const ramp = new THREE.Mesh(new THREE.BoxGeometry(16, 5.5, 24), new THREE.MeshStandardMaterial({ color: 0xffaa00 }));
+        const ramp = new THREE.Mesh(new THREE.BoxGeometry(16, 5.5, 24), new THREE.MeshLambertMaterial({ color: 0xffaa00 }));
         ramp.rotation.x = -0.24;
         rampGroup.add(ramp);
         this.scene.add(rampGroup);
@@ -441,9 +448,9 @@
         const yellowMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
         for (let i = -halfGrid; i <= halfGrid; i++) {
           const coord = i * cellSize;
-          const lineH = new THREE.Mesh(new THREE.PlaneGeometry(1800, 0.7), yellowMat);
+          const lineH = new THREE.Mesh(new THREE.PlaneGeometry(1600, 0.7), yellowMat);
           lineH.rotation.x = -Math.PI / 2; lineH.position.set(0, 0.06, coord);
-          const lineV = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 1800), yellowMat);
+          const lineV = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 1600), yellowMat);
           lineV.rotation.x = -Math.PI / 2; lineV.position.set(coord, 0.06, 0);
           this.scene.add(lineH, lineV);
         }
@@ -459,7 +466,7 @@
       constructor(scene) {
         this.scene = scene;
         this.mesh = new THREE.Group();
-        this.position = new THREE.Vector3(0, 0.4, 80);
+        this.position = new THREE.Vector3(0, 0.4, 0);
         this.speed = 0;
         this.velocityY = 0;
         this.isGrounded = true;
@@ -497,14 +504,14 @@
       }
 
       buildTaxi() {
-        const mat = new THREE.MeshStandardMaterial({ color: 0xffcc00, roughness: 0.3 });
+        const mat = new THREE.MeshLambertMaterial({ color: 0xffcc00 });
         const body = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.9, 6.8), mat);
-        body.position.y = 0.85; body.castShadow = true;
+        body.position.y = 0.85;
         const hood = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.35, 2.2), mat);
         hood.position.set(0, 1.3, 1.8);
-        const windshield = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.2, 0.15), new THREE.MeshStandardMaterial({ color: 0xcaebf2, opacity: 0.6, transparent: true }));
+        const windshield = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.2, 0.15), new THREE.MeshLambertMaterial({ color: 0xcaebf2 }));
         windshield.position.set(0, 1.85, 0.7); windshield.rotation.x = -0.32;
-        const sign = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.5, 0.55), new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffe600 }));
+        const sign = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.5, 0.55), new THREE.MeshBasicMaterial({ color: 0xffffff }));
         sign.position.set(0, 2.5, 0.3);
         this.mesh.add(body, hood, windshield, sign);
 
@@ -515,10 +522,10 @@
       }
 
       buildBus() {
-        const mat = new THREE.MeshStandardMaterial({ color: 0x0077b6, roughness: 0.4 });
+        const mat = new THREE.MeshLambertMaterial({ color: 0x0077b6 });
         const body = new THREE.Mesh(new THREE.BoxGeometry(4.2, 2.4, 13), mat);
-        body.position.y = 1.6; body.castShadow = true;
-        const windows = new THREE.Mesh(new THREE.BoxGeometry(4.3, 0.8, 12), new THREE.MeshStandardMaterial({ color: 0x111111 }));
+        body.position.y = 1.6;
+        const windows = new THREE.Mesh(new THREE.BoxGeometry(4.3, 0.8, 12), new THREE.MeshBasicMaterial({ color: 0x111111 }));
         windows.position.y = 2.0;
         this.mesh.add(body, windows);
 
@@ -529,10 +536,10 @@
       }
 
       buildTruck() {
-        const cab = new THREE.Mesh(new THREE.BoxGeometry(3.8, 2.8, 3.5), new THREE.MeshStandardMaterial({ color: 0xffb703 }));
-        cab.position.set(0, 1.9, 3.5); cab.castShadow = true;
-        const trailer = new THREE.Mesh(new THREE.BoxGeometry(4.0, 3.2, 8.5), new THREE.MeshStandardMaterial({ color: 0xd90429 }));
-        trailer.position.set(0, 2.1, -2.5); trailer.castShadow = true;
+        const cab = new THREE.Mesh(new THREE.BoxGeometry(3.8, 2.8, 3.5), new THREE.MeshLambertMaterial({ color: 0xffb703 }));
+        cab.position.set(0, 1.9, 3.5);
+        const trailer = new THREE.Mesh(new THREE.BoxGeometry(4.0, 3.2, 8.5), new THREE.MeshLambertMaterial({ color: 0xd90429 }));
+        trailer.position.set(0, 2.1, -2.5);
         this.mesh.add(cab, trailer);
 
         this.addWheels([
@@ -542,10 +549,10 @@
       }
 
       addWheels(spots) {
-        const tMat = new THREE.MeshStandardMaterial({ color: 0x181818 });
+        const tMat = new THREE.MeshBasicMaterial({ color: 0x181818 });
         spots.forEach(s => {
           const hub = new THREE.Group(); hub.position.set(s.x, s.y, s.z);
-          const w = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.6, 12), tMat);
+          const w = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.6, 10), tMat);
           w.rotation.z = Math.PI / 2;
           hub.add(w); this.mesh.add(hub);
           this.wheels.push(w);
@@ -569,7 +576,6 @@
           const dir = this.speed >= 0 ? 1 : -1;
           this.angle += this.turnSpeed * steerInput * dir;
 
-          // Drift smoke
           if (Math.abs(this.speed) > this.baseMaxSpeed * 0.7 && Math.abs(steerInput) > 0.6 && this.isGrounded) {
             fx.spawnSmoke(this.position.x, 0.5, this.position.z);
           }
@@ -610,7 +616,7 @@
           this.airTime = 0;
         }
 
-        // Building Collisions
+        // Collisions
         if (colliders) {
           for (let c of colliders) {
             const closestX = Math.max(c.minX, Math.min(this.position.x, c.maxX));
@@ -637,7 +643,7 @@
       }
     }
 
-    // --- 4. MAIN GAME ENGINE ---
+    // --- 4. MAIN ENGINE (ROBUST 60 FPS RENDERER) ---
     class GameApp {
       constructor() {
         this.container = document.getElementById("canvas-container");
@@ -661,13 +667,12 @@
         this.btnArrows = document.getElementById("btn-group-arrows");
         this.wheelAngle = 0;
         this.wheelTouchId = null;
-        this.controlMode = localStorage.getItem("taxi_control_mode") || "wheel";
+        this.controlMode = "wheel"; // Default right-hand wheel
 
         this.initAudio();
         this.initThree();
         this.setupInputs();
         this.setupSteeringWheel();
-        this.applyControlMode(this.controlMode);
         this.spawnEntities();
         this.spawnTraffic();
 
@@ -678,19 +683,21 @@
       initThree() {
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x56b8ff);
-        this.scene.fog = new THREE.Fog(0xd2edff, 220, 750);
 
         this.camera = new THREE.PerspectiveCamera(56, window.innerWidth / window.innerHeight, 0.1, 1500);
+        // Position camera directly behind taxi immediately (prevents blue sky void)
+        this.camera.position.set(0, 9.4, -18);
+        this.camera.lookAt(0, 2, 0);
 
-        this.renderer = new THREE.WebGLRenderer({ antialias: true });
+        this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.shadowMap.enabled = true;
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
         this.container.appendChild(this.renderer.domElement);
 
-        this.scene.add(new THREE.HemisphereLight(0x78c9ff, 0xffe5b4, 0.8));
-        const sun = new THREE.DirectionalLight(0xfff5e0, 1.3);
-        sun.position.set(200, 320, 180);
-        sun.castShadow = true;
+        // Mobile-friendly ambient & sun light
+        this.scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+        const sun = new THREE.DirectionalLight(0xfff5e0, 0.95);
+        sun.position.set(120, 200, 100);
         this.scene.add(sun);
 
         this.city = new CityBuilder(this.scene);
@@ -767,7 +774,6 @@
 
       applyControlMode(mode) {
         this.controlMode = mode;
-        localStorage.setItem("taxi_control_mode", mode);
         document.getElementById("opt-buttons").classList.toggle("active", mode === "buttons");
         document.getElementById("opt-wheel").classList.toggle("active", mode === "wheel");
 
@@ -797,12 +803,12 @@
 
       spawnEntities() {
         this.passengerGroup = new THREE.Group();
-        const pBody = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 2.2, 8), new THREE.MeshStandardMaterial({ color: 0x0077ff }));
+        const pBody = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 2.2, 8), new THREE.MeshBasicMaterial({ color: 0x0077ff }));
         pBody.position.y = 1.1;
         this.passengerGroup.add(pBody);
         this.scene.add(this.passengerGroup);
 
-        this.dropMesh = new THREE.Mesh(new THREE.CylinderGeometry(5.2, 5.2, 0.3, 32), new THREE.MeshBasicMaterial({ color: 0x00ff66, transparent: true, opacity: 0.5 }));
+        this.dropMesh = new THREE.Mesh(new THREE.CylinderGeometry(5.2, 5.2, 0.3, 20), new THREE.MeshBasicMaterial({ color: 0x00ff66, transparent: true, opacity: 0.5 }));
         this.dropMesh.visible = false;
         this.scene.add(this.dropMesh);
         this.repositionPassenger();
@@ -811,12 +817,12 @@
       spawnTraffic() {
         this.trafficCars = [];
         const colors = [0xffffff, 0x111111, 0x0066cc, 0xcc0000];
-        for (let i = 0; i < 6; i++) {
+        for (let i = 0; i < 4; i++) {
           const carGroup = new THREE.Group();
-          const body = new THREE.Mesh(new THREE.BoxGeometry(3.4, 1.2, 6.2), new THREE.MeshStandardMaterial({ color: colors[i % colors.length] }));
+          const body = new THREE.Mesh(new THREE.BoxGeometry(3.4, 1.2, 6.2), new THREE.MeshLambertMaterial({ color: colors[i % colors.length] }));
           body.position.y = 0.9;
           carGroup.add(body);
-          carGroup.position.set((i - 3) * 205 + 102, 0.4, (Math.random() - 0.5) * 600);
+          carGroup.position.set((i - 2) * 205 + 102, 0.4, (Math.random() - 0.5) * 600);
           this.scene.add(carGroup);
           this.trafficCars.push({ mesh: carGroup, speed: 0.7, dir: Math.random() > 0.5 ? 1 : -1 });
         }
@@ -855,7 +861,6 @@
 
         if (this.stuntCooldown > 0) this.stuntCooldown--;
 
-        // Auto-center steering wheel when released
         if (this.controlMode === "wheel" && this.wheelTouchId === null && Math.abs(this.wheelAngle) > 0.001) {
           this.wheelAngle *= 0.82;
           this.keys.steerRatio = this.wheelAngle / (Math.PI * 0.72);
@@ -865,13 +870,11 @@
         this.taxi.update(this.keys, this.city.colliders, this.city.ramps, this.fx);
         this.fx.update();
 
-        // Stunt Jump Trigger
         if (this.taxi.airTime > 0.55 && this.taxi.isGrounded) {
           this.showStunt("CRAZY JUMP!", 35);
           this.taxi.airTime = 0;
         }
 
-        // Gear Indicator
         if (this.taxi.speed < -0.05) {
           this.gearD.className = ""; this.gearR.className = "gear-active";
         } else {
@@ -879,7 +882,7 @@
         }
 
         // Camera Follow
-        const targetFOV = this.taxi.isNitro ? 70 : 56;
+        const targetFOV = this.taxi.isNitro ? 66 : 56;
         this.camera.fov += (targetFOV - this.camera.fov) * 0.1;
         this.camera.updateProjectionMatrix();
 
@@ -887,8 +890,8 @@
         const camDist = 18 + speedRatio * 4;
         const camHeight = 9 + speedRatio * 2;
         const camOffset = new THREE.Vector3(-Math.sin(this.taxi.angle) * camDist, camHeight, -Math.cos(this.taxi.angle) * camDist);
-        this.camera.position.lerp(this.taxi.position.clone().add(camOffset), 0.12);
-        this.camera.lookAt(this.taxi.position.clone().add(new THREE.Vector3(0, 2, 0)));
+        this.camera.position.lerp(this.taxi.position.clone().add(camOffset), 0.15);
+        this.camera.lookAt(this.taxi.position.clone().add(new THREE.Vector3(0, 1.8, 0)));
 
         // Passenger Pickup / Dropoff
         const isStopped = Math.abs(this.taxi.speed) < 0.15;
@@ -910,7 +913,7 @@
           setTimeout(() => this.repositionPassenger(), 1400);
         }
 
-        // Navigation Guide Arrow
+        // Guide Arrow
         const targetPos = this.hasPassenger ? this.dropPos : this.passengerPos;
         if (targetPos) {
           const angleDiff = Math.atan2(targetPos.x - this.taxi.position.x, targetPos.z - this.taxi.position.z) - this.taxi.angle;

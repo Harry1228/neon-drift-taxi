@@ -1,4 +1,4 @@
-// MAIN GAME LOOP: 3D TRAFFIC, STUNT COMBOS, NITRO & AUDIO
+// MAIN GAME LOOP WITH ROTARY STEERING WHEEL & SETTINGS CONTROLLER
 class GameApp {
   constructor() {
     this.container = document.getElementById("canvas-container");
@@ -17,11 +17,22 @@ class GameApp {
     this.hasPassenger = false;
     this.stuntCooldown = 0;
 
-    this.keys = { left: false, right: false, gas: false, brake: false, nitro: false };
+    // Keys & continuous steering ratio (-1.0 to 1.0)
+    this.keys = { left: false, right: false, gas: false, brake: false, nitro: false, steerRatio: 0 };
+
+    // Steering Wheel State
+    this.wheelElem = document.getElementById("wheel");
+    this.wheelWrapper = document.getElementById("wheel-wrapper");
+    this.btnArrows = document.getElementById("btn-group-arrows");
+    this.wheelAngle = 0;
+    this.wheelTouchId = null;
+    this.controlMode = localStorage.getItem("taxi_control_mode") || "buttons";
 
     this.initAudio();
     this.initThree();
     this.setupInputs();
+    this.setupSteeringWheel();
+    this.applyControlMode(this.controlMode);
     this.spawnEntities();
     this.spawnTraffic();
 
@@ -106,6 +117,108 @@ class GameApp {
     });
   }
 
+  // --- ROTARY STEERING WHEEL LOGIC ---
+  setupSteeringWheel() {
+    const el = this.wheelWrapper;
+
+    const handleWheelTouch = (touch) => {
+      const rect = el.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const dx = touch.clientX - cx;
+      const dy = touch.clientY - cy;
+
+      // Angle from vertical (0 is straight up)
+      let rad = Math.atan2(dx, -dy);
+      const maxRad = Math.PI * 0.72; // ~130 degrees max turn
+
+      rad = Math.max(-maxRad, Math.min(maxRad, rad));
+      this.wheelAngle = rad;
+      this.keys.steerRatio = rad / maxRad; // -1.0 (full left) to +1.0 (full right)
+      this.wheelElem.style.transform = `rotate(${rad * (180 / Math.PI)}deg)`;
+    };
+
+    el.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      if (this.wheelTouchId === null) {
+        const touch = e.changedTouches[0];
+        this.wheelTouchId = touch.identifier;
+        handleWheelTouch(touch);
+      }
+    }, { passive: false });
+
+    el.addEventListener("touchmove", (e) => {
+      e.preventDefault();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (touch.identifier === this.wheelTouchId) {
+          handleWheelTouch(touch);
+          break;
+        }
+      }
+    }, { passive: false });
+
+    const releaseWheel = (e) => {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === this.wheelTouchId) {
+          this.wheelTouchId = null;
+          break;
+        }
+      }
+    };
+    el.addEventListener("touchend", releaseWheel);
+    el.addEventListener("touchcancel", releaseWheel);
+  }
+
+  applyControlMode(mode) {
+    this.controlMode = mode;
+    localStorage.setItem("taxi_control_mode", mode);
+
+    document.getElementById("opt-buttons").classList.toggle("active", mode === "buttons");
+    document.getElementById("opt-wheel").classList.toggle("active", mode === "wheel");
+
+    if (mode === "wheel") {
+      this.btnArrows.style.display = "none";
+      this.wheelWrapper.style.display = "block";
+    } else {
+      this.btnArrows.style.display = "flex";
+      this.wheelWrapper.style.display = "none";
+      this.keys.steerRatio = 0;
+    }
+  }
+
+  setupInputs() {
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "a" || e.key === "ArrowLeft") this.keys.left = true;
+      if (e.key === "d" || e.key === "ArrowRight") this.keys.right = true;
+      if (e.key === "w" || e.key === "ArrowUp") this.keys.gas = true;
+      if (e.key === "s" || e.key === "ArrowDown") this.keys.brake = true;
+      if (e.key === "Shift" || e.key.toLowerCase() === "n") this.keys.nitro = true;
+      if (e.key === " " || e.key.toLowerCase() === "h") this.playHorn();
+    });
+    window.addEventListener("keyup", (e) => {
+      if (e.key === "a" || e.key === "ArrowLeft") this.keys.left = false;
+      if (e.key === "d" || e.key === "ArrowRight") this.keys.right = false;
+      if (e.key === "w" || e.key === "ArrowUp") this.keys.gas = false;
+      if (e.key === "s" || e.key === "ArrowDown") this.keys.brake = false;
+      if (e.key === "Shift" || e.key.toLowerCase() === "n") this.keys.nitro = false;
+    });
+
+    const bind = (id, action) => {
+      const el = document.getElementById(id);
+      el.addEventListener("touchstart", (e) => { e.preventDefault(); this.keys[action] = true; });
+      el.addEventListener("touchend", (e) => { e.preventDefault(); this.keys[action] = false; });
+    };
+    bind("btn-left", "left");
+    bind("btn-right", "right");
+    bind("btn-gas", "gas");
+    bind("btn-brake", "brake");
+    bind("btn-nitro", "nitro");
+    document.getElementById("btn-horn").addEventListener("touchstart", (e) => {
+      e.preventDefault(); this.playHorn();
+    });
+  }
+
   spawnEntities() {
     this.passengerGroup = new THREE.Group();
 
@@ -146,7 +259,6 @@ class GameApp {
     this.trafficCars = [];
     const colors = [0xffffff, 0x111111, 0x0066cc, 0xcc0000, 0x228b22, 0x9932cc];
 
-    // Spawn 8 active civilian traffic cars
     for (let i = 0; i < 8; i++) {
       const carGroup = new THREE.Group();
       const bodyColor = colors[i % colors.length];
@@ -166,7 +278,6 @@ class GameApp {
       cab.position.set(0, 1.8, -0.2);
       carGroup.add(cab);
 
-      // Random placement along grid avenues
       const isVertical = i % 2 === 0;
       const x = isVertical ? (i - 4) * 205 + 102 : (Math.random() - 0.5) * 600;
       const z = isVertical ? (Math.random() - 0.5) * 600 : (i - 4) * 205 + 102;
@@ -189,7 +300,7 @@ class GameApp {
     this.wallet += bonus;
     this.totalVal.innerText = "$" + this.wallet.toFixed(2).padStart(6, "0");
     this.playChime(600, 950);
-    this.stuntCooldown = 60; // 1s cooldown
+    this.stuntCooldown = 60;
 
     setTimeout(() => {
       this.stuntBanner.classList.remove("show");
@@ -211,38 +322,6 @@ class GameApp {
     this.dropMesh.visible = true;
   }
 
-  setupInputs() {
-    window.addEventListener("keydown", (e) => {
-      if (e.key === "a" || e.key === "ArrowLeft") this.keys.left = true;
-      if (e.key === "d" || e.key === "ArrowRight") this.keys.right = true;
-      if (e.key === "w" || e.key === "ArrowUp") this.keys.gas = true;
-      if (e.key === "s" || e.key === "ArrowDown") this.keys.brake = true;
-      if (e.key === "Shift" || e.key.toLowerCase() === "n") this.keys.nitro = true;
-      if (e.key === " " || e.key.toLowerCase() === "h") this.playHorn();
-    });
-    window.addEventListener("keyup", (e) => {
-      if (e.key === "a" || e.key === "ArrowLeft") this.keys.left = false;
-      if (e.key === "d" || e.key === "ArrowRight") this.keys.right = false;
-      if (e.key === "w" || e.key === "ArrowUp") this.keys.gas = false;
-      if (e.key === "s" || e.key === "ArrowDown") this.keys.brake = false;
-      if (e.key === "Shift" || e.key.toLowerCase() === "n") this.keys.nitro = false;
-    });
-
-    const bind = (id, action) => {
-      const el = document.getElementById(id);
-      el.addEventListener("touchstart", (e) => { e.preventDefault(); this.keys[action] = true; });
-      el.addEventListener("touchend", (e) => { e.preventDefault(); this.keys[action] = false; });
-    };
-    bind("btn-left", "left");
-    bind("btn-right", "right");
-    bind("btn-gas", "gas");
-    bind("btn-brake", "brake");
-    bind("btn-nitro", "nitro");
-    document.getElementById("btn-horn").addEventListener("touchstart", (e) => {
-      e.preventDefault(); this.playHorn();
-    });
-  }
-
   animate() {
     if (this.timeLeft > 0) {
       this.timeLeft -= 1 / 60;
@@ -253,6 +332,13 @@ class GameApp {
 
     if (this.stuntCooldown > 0) this.stuntCooldown--;
 
+    // Wheel Spring-Back when finger is lifted
+    if (this.controlMode === "wheel" && this.wheelTouchId === null && Math.abs(this.wheelAngle) > 0.001) {
+      this.wheelAngle *= 0.82; // Smooth auto-center spring
+      this.keys.steerRatio = this.wheelAngle / (Math.PI * 0.72);
+      this.wheelElem.style.transform = `rotate(${this.wheelAngle * (180 / Math.PI)}deg)`;
+    }
+
     // 1. Taxi Physics
     this.taxi.update(this.keys, this.city.colliders, this.city.ramps);
 
@@ -262,7 +348,7 @@ class GameApp {
       this.taxi.airTime = 0;
     }
 
-    // 2. Traffic Simulation & Near-Miss Detection
+    // 2. Traffic Simulation
     for (let t of this.trafficCars) {
       if (t.isVertical) {
         t.mesh.position.z += t.speed * t.dir;
@@ -276,14 +362,11 @@ class GameApp {
         if (t.mesh.position.x < -600) t.mesh.position.x = 600;
       }
 
-      // Proximity to Taxi
       const dist = this.taxi.position.distanceTo(t.mesh.position);
       if (dist < 4.2) {
-        // Crash
         this.taxi.speed = -this.taxi.speed * 0.4;
         this.showStunt("CRASH! -$10", -10);
       } else if (dist < 7.2 && this.taxi.speed > 1.8) {
-        // High-Speed Near Miss
         this.showStunt("NEAR MISS!", 20);
       }
     }
@@ -295,7 +378,7 @@ class GameApp {
       this.gearD.className = "gear-active"; this.gearR.className = "";
     }
 
-    // 3. Dynamic Camera (Nitro Speed FOV Warp)
+    // Dynamic Camera (Nitro FOV)
     const targetFOV = this.taxi.isNitro ? 66 : 56;
     this.camera.fov += (targetFOV - this.camera.fov) * 0.1;
     this.camera.updateProjectionMatrix();
@@ -315,7 +398,7 @@ class GameApp {
     const lookTarget = this.taxi.position.clone().add(new THREE.Vector3(0, 1.8, 0));
     this.camera.lookAt(lookTarget);
 
-    // 4. Passenger Pickup / Dropoff
+    // Passenger Pickup / Dropoff
     const isStopped = Math.abs(this.taxi.speed) < 0.15;
     this.coinMesh.rotation.y += 0.05;
 
@@ -346,7 +429,7 @@ class GameApp {
       }
     }
 
-    // 5. Compass Arrow Angle
+    // Compass Arrow
     const targetPos = this.hasPassenger ? this.dropPos : this.passengerPos;
     if (targetPos) {
       const dx = targetPos.x - this.taxi.position.x;
@@ -361,4 +444,16 @@ class GameApp {
   }
 }
 
-window.onload = () => new GameApp();
+// Global UI helper functions
+let gameApp = null;
+window.onload = () => { gameApp = new GameApp(); };
+
+function openSettings() {
+  document.getElementById("settings-modal").style.display = "flex";
+}
+function closeSettings() {
+  document.getElementById("settings-modal").style.display = "none";
+}
+function setControlMode(mode) {
+  if (gameApp) gameApp.applyControlMode(mode);
+}

@@ -3,82 +3,73 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Crazy Taxi 3D: Open World Stunt City</title>
+  <title>Crazy Taxi 3D: Massive Open World</title>
   <link rel="stylesheet" href="style.css">
+  <style>
+    /* Add extra garage styles */
+    #garage-modal { position: absolute; inset: 0; background: rgba(10, 15, 25, 0.92); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(8px); }
+    #garage-modal h2 { font-size: 26px; color: #ffcc00; margin-bottom: 20px; }
+    .v-btn { background: #1e293b; border: 3px solid #475569; color: #fff; border-radius: 12px; padding: 14px 22px; font-size: 16px; font-weight: bold; cursor: pointer; margin: 10px; width: 200px;}
+    .v-btn:active { background: #ffcc00; color: #000; }
+  </style>
 </head>
 <body>
 
-  <!-- Retro Arcade HUD -->
   <div id="hud">
     <div id="timer-box">
       <div id="timer-val">60"00</div>
       <div id="timer-sub">TIME LIMIT</div>
     </div>
-
     <div class="hud-center">
-      <div id="guide-arrow-container">
-        <div id="guide-arrow"></div>
-      </div>
+      <div id="guide-arrow-container"><div id="guide-arrow"></div></div>
       <button id="btn-settings-toggle" onclick="openSettings()">⚙️ CONTROLS</button>
+      <button id="btn-settings-toggle" onclick="openGarage()">🚘 GARAGE</button>
     </div>
-
     <div id="meter-box">
-      <div class="roller-label">FARE</div>
-      <div class="roller-line" id="fare-val">$000.00</div>
-      <div class="roller-label">TOTAL EARNED</div>
-      <div class="roller-line" id="total-val">$000.00</div>
+      <div class="roller-label">FARE</div><div class="roller-line" id="fare-val">$000.00</div>
+      <div class="roller-label">TOTAL EARNED</div><div class="roller-line" id="total-val">$000.00</div>
     </div>
   </div>
 
-  <!-- Stunt Popup -->
   <div id="stunt-banner">CRAZY JUMP! +$35</div>
-
-  <div id="gear-box">
-    <span id="gear-d" class="gear-active">D</span> | <span id="gear-r">R</span>
-  </div>
 
   <div id="canvas-container"></div>
 
-  <!-- SETTINGS MODAL -->
+  <!-- Settings -->
   <div id="settings-modal">
     <h2>STEERING SETTINGS</h2>
     <div class="setting-option">
-      <button class="opt-btn active" id="opt-buttons" onclick="setControlMode('buttons')">
-        <span>◀ ▶</span>
-        Buttons
-      </button>
-      <button class="opt-btn" id="opt-wheel" onclick="setControlMode('wheel')">
-        <span>🛞</span>
-        Steering Wheel
-      </button>
+      <button class="opt-btn active" id="opt-buttons" onclick="setControlMode('buttons')"><span>◀ ▶</span>Buttons</button>
+      <button class="opt-btn" id="opt-wheel" onclick="setControlMode('wheel')"><span>🛞</span>Steering Wheel</button>
     </div>
-    <button id="btn-close-settings" onclick="closeSettings()">RESUME GAME</button>
+    <button id="btn-close-settings" onclick="closeSettings()">RESUME</button>
   </div>
 
-  <!-- Mobile Touch Controls -->
+  <!-- Garage -->
+  <div id="garage-modal">
+    <h2>SELECT VEHICLE</h2>
+    <button class="v-btn" onclick="selectVehicle('taxi')">🚖 CRAZY CAB</button>
+    <button class="v-btn" onclick="selectVehicle('bus')">🚌 CITY BUS</button>
+    <button class="v-btn" onclick="selectVehicle('truck')">🚛 BIG RIG TRUCK</button>
+    <button id="btn-close-settings" onclick="closeGarage()">CANCEL</button>
+  </div>
+
   <div class="touch-controls">
-    <!-- Left Side: Pedals + Nitro + Horn -->
     <div class="btn-group">
       <div class="t-btn pedal-gas" id="btn-gas">GAS</div>
       <div class="t-btn pedal-brake" id="btn-brake">R</div>
       <div class="t-btn btn-nitro" id="btn-nitro">NOS</div>
       <div class="t-btn btn-horn" id="btn-horn">📯</div>
     </div>
-
-    <!-- Right Side: Arrow Buttons OR Steering Wheel -->
     <div class="btn-group" id="btn-group-arrows">
-      <div class="t-btn" id="btn-left">◀</div>
-      <div class="t-btn" id="btn-right">▶</div>
+      <div class="t-btn" id="btn-left">◀</div><div class="t-btn" id="btn-right">▶</div>
     </div>
-
-    <div id="wheel-wrapper">
-      <div id="wheel">
-        <div id="wheel-center">TAXI</div>
-      </div>
-    </div>
+    <div id="wheel-wrapper"><div id="wheel"><div id="wheel-center">TAXI</div></div></div>
   </div>
 
+  <!-- Note: We are loading the new fx.js file here -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="js/fx.js"></script>
   <script src="js/city.js"></script>
   <script src="js/vehicle.js"></script>
   <script src="js/main.js"></script>

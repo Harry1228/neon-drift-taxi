@@ -3,19 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Crazy Taxi 3D Arcade</title>
+  <title>Crazy Taxi 3D: Open World Stunt City</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <!-- Retro HUD -->
+  <!-- Retro Arcade HUD -->
   <div id="hud">
     <div id="timer-box">
-      <div id="timer-val">50"00</div>
+      <div id="timer-val">60"00</div>
       <div id="timer-sub">TIME LIMIT</div>
     </div>
 
-    <!-- 3D Navigation Guide Arrow -->
     <div id="guide-arrow-container">
       <div id="guide-arrow"></div>
     </div>
@@ -28,14 +27,16 @@
     </div>
   </div>
 
+  <!-- Crazy Stunt Popup Banner -->
+  <div id="stunt-banner">CRAZY JUMP! +$35</div>
+
   <div id="gear-box">
     <span id="gear-d" class="gear-active">D</span> | <span id="gear-r">R</span>
   </div>
 
-  <!-- 3D WebGL Canvas Container -->
   <div id="canvas-container"></div>
 
-  <!-- Mobile Touch Pedals -->
+  <!-- Touch Pedals + Nitro Button -->
   <div class="touch-controls">
     <div class="btn-group">
       <div class="t-btn" id="btn-left">◀</div>
@@ -43,15 +44,13 @@
     </div>
     <div class="btn-group">
       <div class="t-btn btn-horn" id="btn-horn">📯</div>
+      <div class="t-btn btn-nitro" id="btn-nitro">NOS</div>
       <div class="t-btn pedal-brake" id="btn-brake">R</div>
       <div class="t-btn pedal-gas" id="btn-gas">GAS</div>
     </div>
   </div>
 
-  <!-- Three.js 3D Engine CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-
-  <!-- Game Modules -->
   <script src="js/city.js"></script>
   <script src="js/vehicle.js"></script>
   <script src="js/main.js"></script>

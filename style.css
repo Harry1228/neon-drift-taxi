@@ -67,9 +67,9 @@ body {
 }
 #stunt-banner.show { transform: translateX(-50%) scale(1.15); opacity: 1; }
 
-/* Gear Box */
+/* Gear Box (Raised to 160px so it sits cleanly above the right-hand steering wheel) */
 #gear-box {
-  position: absolute; bottom: 105px; right: 20px;
+  position: absolute; bottom: 160px; right: 20px;
   background: #ffcc00; border: 3px solid #333; border-radius: 6px;
   padding: 4px 8px; text-align: center; font-size: 16px; font-weight: 900;
   color: #111; z-index: 10; pointer-events: none;
@@ -99,7 +99,7 @@ body {
 }
 .btn-horn { background: rgba(240, 150, 0, 0.75); border-color: #ffaa00; width: 50px; height: 50px; font-size: 18px; }
 
-/* ROTARY STEERING WHEEL */
+/* ROTARY STEERING WHEEL (RIGHT SIDE) */
 #wheel-wrapper {
   pointer-events: auto; position: relative; width: 130px; height: 130px;
   display: none; touch-action: none;

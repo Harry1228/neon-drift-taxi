@@ -1,0 +1,80 @@
+* { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+body {
+  background-color: #11141c; color: #fff;
+  font-family: "Impact", "Arial Black", sans-serif;
+  overflow: hidden; touch-action: none; width: 100vw; height: 100vh;
+}
+
+#canvas-container {
+  position: absolute; inset: 0; z-index: 1;
+}
+
+/* Retro Arcade HUD */
+#hud {
+  position: absolute; top: 10px; left: 10px; right: 10px;
+  display: flex; justify-content: space-between; align-items: flex-start;
+  pointer-events: none; z-index: 10;
+}
+
+#timer-box {
+  background: #000; border: 3px solid #ffcc00; border-radius: 6px;
+  padding: 4px 10px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.7);
+}
+#timer-val {
+  font-size: 28px; color: #ff1a00;
+  text-shadow: 2px 2px 0 #ffe600, -1px -1px 0 #000;
+  letter-spacing: 2px;
+}
+#timer-sub { font-size: 9px; color: #ffcc00; letter-spacing: 1px; }
+
+#meter-box {
+  background: #ffcc00; border: 3px solid #b8860b; border-radius: 6px;
+  padding: 4px 8px; text-align: right; box-shadow: 0 4px 12px rgba(0,0,0,0.7);
+}
+.roller-line {
+  background: #111; color: #00ff66; font-family: "Courier New", monospace;
+  font-weight: 900; font-size: 15px; padding: 2px 6px; border-radius: 3px;
+  letter-spacing: 2px; margin-bottom: 2px; border: 1px solid #333;
+}
+.roller-label { font-size: 8px; color: #333; font-weight: bold; }
+
+/* Compass Arrow (Top-Center) */
+#guide-arrow-container {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  pointer-events: none; z-index: 10;
+}
+#guide-arrow {
+  width: 0; height: 0;
+  border-left: 14px solid transparent;
+  border-right: 14px solid transparent;
+  border-bottom: 34px solid #00ff66;
+  filter: drop-shadow(0 2px 6px rgba(0,255,100,0.6));
+  transition: transform 0.05s linear;
+}
+
+/* Gear Box (Bottom-Right) */
+#gear-box {
+  position: absolute; bottom: 105px; right: 20px;
+  background: #ffcc00; border: 3px solid #333; border-radius: 6px;
+  padding: 4px 8px; text-align: center; font-size: 16px; font-weight: 900;
+  color: #111; z-index: 10; pointer-events: none;
+}
+.gear-active { background: #ff2200; color: #fff; padding: 2px 6px; border-radius: 4px; }
+
+/* Mobile Touch Driving Controls */
+.touch-controls {
+  position: absolute; bottom: 20px; left: 0; right: 0;
+  display: flex; justify-content: space-between; padding: 0 16px;
+  pointer-events: none; z-index: 20;
+}
+.btn-group { display: flex; gap: 10px; pointer-events: auto; }
+.t-btn {
+  width: 65px; height: 65px; border-radius: 50%; border: 3px solid #ffcc00;
+  background: rgba(0, 0, 0, 0.75); color: #fff; font-size: 24px; font-weight: bold;
+  display: flex; align-items: center; justify-content: center; touch-action: none;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+}
+.t-btn:active { background: #ffcc00; color: #000; }
+.pedal-gas { background: rgba(0, 180, 50, 0.75); border-color: #00ff66; }
+.pedal-brake { background: rgba(220, 30, 30, 0.75); border-color: #ff3333; }
+.btn-horn { background: rgba(240, 150, 0, 0.75); border-color: #ffaa00; width: 52px; height: 52px; font-size: 18px; margin-top: 10px; }

@@ -1,13 +1,11 @@
 * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
 body {
-  background-color: #11141c; color: #fff;
+  background-color: #56b8ff; color: #fff;
   font-family: "Impact", "Arial Black", sans-serif;
   overflow: hidden; touch-action: none; width: 100vw; height: 100vh;
 }
 
-#canvas-container {
-  position: absolute; inset: 0; z-index: 1;
-}
+#canvas-container { position: absolute; inset: 0; z-index: 1; }
 
 /* Retro Arcade HUD */
 #hud {
@@ -38,7 +36,19 @@ body {
 }
 .roller-label { font-size: 8px; color: #333; font-weight: bold; }
 
-/* Compass Arrow (Top-Center) */
+/* Stunt Combo Popups */
+#stunt-banner {
+  position: absolute; top: 75px; left: 50%; transform: translateX(-50%) scale(0);
+  background: linear-gradient(135deg, #ff0055, #ff5500);
+  color: #fff; border: 3px solid #ffcc00; padding: 6px 18px; border-radius: 25px;
+  font-size: 16px; font-weight: 900; letter-spacing: 2px; text-shadow: 2px 2px 0 #000;
+  box-shadow: 0 0 20px rgba(255,85,0,0.8); pointer-events: none; z-index: 25;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
+  opacity: 0;
+}
+#stunt-banner.show { transform: translateX(-50%) scale(1.15); opacity: 1; }
+
+/* 3D Direction Guide Arrow */
 #guide-arrow-container {
   position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
   pointer-events: none; z-index: 10;
@@ -48,11 +58,11 @@ body {
   border-left: 14px solid transparent;
   border-right: 14px solid transparent;
   border-bottom: 34px solid #00ff66;
-  filter: drop-shadow(0 2px 6px rgba(0,255,100,0.6));
+  filter: drop-shadow(0 2px 8px rgba(0,255,100,0.8));
   transition: transform 0.05s linear;
 }
 
-/* Gear Box (Bottom-Right) */
+/* Gear Box */
 #gear-box {
   position: absolute; bottom: 105px; right: 20px;
   background: #ffcc00; border: 3px solid #333; border-radius: 6px;
@@ -63,11 +73,11 @@ body {
 
 /* Mobile Touch Driving Controls */
 .touch-controls {
-  position: absolute; bottom: 20px; left: 0; right: 0;
+  position: absolute; bottom: 18px; left: 0; right: 0;
   display: flex; justify-content: space-between; padding: 0 16px;
   pointer-events: none; z-index: 20;
 }
-.btn-group { display: flex; gap: 10px; pointer-events: auto; }
+.btn-group { display: flex; gap: 10px; pointer-events: auto; align-items: flex-end; }
 .t-btn {
   width: 65px; height: 65px; border-radius: 50%; border: 3px solid #ffcc00;
   background: rgba(0, 0, 0, 0.75); color: #fff; font-size: 24px; font-weight: bold;
@@ -77,4 +87,9 @@ body {
 .t-btn:active { background: #ffcc00; color: #000; }
 .pedal-gas { background: rgba(0, 180, 50, 0.75); border-color: #00ff66; }
 .pedal-brake { background: rgba(220, 30, 30, 0.75); border-color: #ff3333; }
-.btn-horn { background: rgba(240, 150, 0, 0.75); border-color: #ffaa00; width: 52px; height: 52px; font-size: 18px; margin-top: 10px; }
+.btn-nitro {
+  background: linear-gradient(135deg, #00d2ff, #0066ff);
+  border-color: #00f0ff; width: 56px; height: 56px; font-size: 16px;
+  box-shadow: 0 0 12px rgba(0, 210, 255, 0.6);
+}
+.btn-horn { background: rgba(240, 150, 0, 0.75); border-color: #ffaa00; width: 50px; height: 50px; font-size: 18px; }

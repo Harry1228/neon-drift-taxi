@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Crazy Taxi 2D Arcade</title>
+  <title>Crazy Taxi: Open World Tour</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-    body { background-color: #222; color: #fff; font-family: "Impact", "Arial Black", sans-serif; overflow: hidden; touch-action: none; }
+    body { background-color: #111; color: #fff; font-family: "Impact", "Arial Black", sans-serif; overflow: hidden; touch-action: none; }
 
     /* Crazy Taxi Arcade HUD */
     #hud {
@@ -15,18 +15,16 @@
       pointer-events: none; z-index: 10;
     }
     
-    /* Countdown Timer (Top-Left) */
     #timer-box {
       background: #000; border: 3px solid #ffcc00; border-radius: 6px;
       padding: 4px 10px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.6);
     }
     #timer-val {
-      font-size: 32px; color: #ff2200; text-shadow: 2px 2px 0 #ffe600, -1px -1px 0 #000;
+      font-size: 30px; color: #ff2200; text-shadow: 2px 2px 0 #ffe600, -1px -1px 0 #000;
       letter-spacing: 2px;
     }
     #timer-sub { font-size: 10px; color: #ffcc00; letter-spacing: 1px; }
 
-    /* Crazy Taxi Roller Meter (Top-Right) */
     #meter-box {
       background: #ffcc00; border: 3px solid #b8860b; border-radius: 6px;
       padding: 4px 8px; text-align: right; box-shadow: 0 4px 10px rgba(0,0,0,0.6);
@@ -34,11 +32,18 @@
     .roller-line {
       background: #111; color: #00ff66; font-family: "Courier New", monospace;
       font-weight: 900; font-size: 16px; padding: 2px 6px; border-radius: 3px;
-      letter-spacing: 2px; margin-bottom: 3px; border: 1px solid #333;
+      letter-spacing: 2px; margin-bottom: 2px; border: 1px solid #333;
     }
     .roller-label { font-size: 9px; color: #333; font-weight: bold; }
 
-    /* Gear Indicator (Bottom-Right) */
+    /* District Notification Banner */
+    #district-banner {
+      position: absolute; top: 90px; left: 50%; transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.85); border: 2px solid #ffcc00; color: #ffcc00;
+      padding: 6px 16px; border-radius: 20px; font-size: 14px; font-weight: bold;
+      letter-spacing: 1px; pointer-events: none; z-index: 10; transition: opacity 0.5s;
+    }
+
     #gear-box {
       position: absolute; bottom: 105px; right: 20px;
       background: #ffcc00; border: 3px solid #333; border-radius: 6px;
@@ -49,7 +54,7 @@
 
     canvas { display: block; width: 100vw; height: 100vh; }
 
-    /* On-Screen Driving Controls */
+    /* Mobile Touch Pedals & Steering */
     .touch-controls {
       position: absolute; bottom: 20px; left: 0; right: 0;
       display: flex; justify-content: space-between; padding: 0 20px;
@@ -69,10 +74,9 @@
 </head>
 <body>
 
-  <!-- Retro HUD -->
   <div id="hud">
     <div id="timer-box">
-      <div id="timer-val">45"00</div>
+      <div id="timer-val">60"00</div>
       <div id="timer-sub">TIME LIMIT</div>
     </div>
 
@@ -84,13 +88,14 @@
     </div>
   </div>
 
+  <div id="district-banner">DOWNTOWN METRO</div>
+
   <div id="gear-box">
     <span id="gear-d" class="gear-active">D</span> | <span id="gear-r">R</span>
   </div>
 
   <canvas id="game"></canvas>
 
-  <!-- Mobile Touch Pedals & Steering -->
   <div class="touch-controls">
     <div class="btn-group">
       <div class="t-btn" id="btn-left">◀</div>
@@ -108,8 +113,13 @@
     const timerVal = document.getElementById("timer-val");
     const fareVal = document.getElementById("fare-val");
     const totalVal = document.getElementById("total-val");
+    const districtBanner = document.getElementById("district-banner");
     const gearD = document.getElementById("gear-d");
     const gearR = document.getElementById("gear-r");
+
+    // HUGE OPEN WORLD BOUNDARIES
+    const WORLD_W = 2400;
+    const WORLD_H = 4800; // Long vertical journey
 
     function resize() {
       canvas.width = window.innerWidth;
@@ -138,24 +148,29 @@
       osc.stop(audioCtx.currentTime + duration);
     }
 
-    // Game Variables
+    // Game State
     let totalScore = 0;
     let currentFare = 0;
-    let timeLeft = 45.0;
+    let timeLeft = 60.0;
     let hasPassenger = false;
     let waveTick = 0;
+    let currentDistrict = "";
 
+    // Taxi player stats (starts at bottom Downtown area)
     const car = {
-      x: canvas.width / 2, y: canvas.height * 0.7,
+      x: WORLD_W / 2, y: WORLD_H - 400,
       speed: 0, angle: -Math.PI / 2,
-      maxSpeed: 6.8, accel: 0.28, friction: 0.94, turnSpeed: 0.075
+      maxSpeed: 8.5, accel: 0.32, friction: 0.94, turnSpeed: 0.075
     };
 
-    // Customer & Destination
-    let customer = { x: 140, y: 180, r: 52, active: true };
-    let dropoff = { x: canvas.width - 140, y: 220, r: 52, active: false };
+    // Camera viewport coordinates
+    const camera = { x: 0, y: 0 };
 
-    // Keyboard & Touch Inputs
+    // Dynamic Destinations across different world zones
+    let customer = { x: WORLD_W / 2 - 150, y: WORLD_H - 600, r: 60, active: true };
+    let dropoff = { x: WORLD_W / 2 + 150, y: 800, r: 60, active: false };
+
+    // Key & Touch Inputs
     const keys = { left: false, right: false, gas: false, brake: false };
 
     window.addEventListener("keydown", (e) => {
@@ -186,8 +201,21 @@
       return num.toFixed(2).padStart(6, "0");
     }
 
+    // Random location generator ensuring long trips between zones
+    function getFarLocation(currentY) {
+      const x = Math.random() * (WORLD_W - 600) + 300;
+      let y;
+      // If player is south (Downtown), send them north (Beach/Suburbs) and vice-versa
+      if (currentY > WORLD_H / 2) {
+        y = Math.random() * (WORLD_H * 0.45) + 200; // North zone
+      } else {
+        y = Math.random() * (WORLD_H * 0.45) + (WORLD_H * 0.5); // South zone
+      }
+      return { x, y };
+    }
+
     function gameLoop() {
-      // 1. Countdown Timer
+      // 1. Timer Countdown
       if (timeLeft > 0) {
         timeLeft -= 1 / 60;
         const sec = Math.floor(timeLeft);
@@ -197,7 +225,7 @@
         timerVal.innerText = "00'00";
       }
 
-      // 2. Car Dynamics & Gear Display
+      // 2. Car Dynamics
       if (Math.abs(car.speed) > 0.4) {
         const dir = car.speed >= 0 ? 1 : -1;
         if (keys.left) car.angle -= car.turnSpeed * dir;
@@ -212,43 +240,57 @@
         car.speed *= car.friction;
       }
 
-      // Update Gear UI
+      // Gear Display
       if (car.speed < -0.2) {
-        gearD.className = "";
-        gearR.className = "gear-active";
+        gearD.className = ""; gearR.className = "gear-active";
       } else {
-        gearD.className = "gear-active";
-        gearR.className = "";
+        gearD.className = "gear-active"; gearR.className = "";
       }
 
       car.x += Math.cos(car.angle) * car.speed;
       car.y += Math.sin(car.angle) * car.speed;
 
-      // Keep within bounds
-      car.x = Math.max(30, Math.min(canvas.width - 30, car.x));
-      car.y = Math.max(30, Math.min(canvas.height - 30, car.y));
+      // Keep inside World map boundaries
+      car.x = Math.max(60, Math.min(WORLD_W - 60, car.x));
+      car.y = Math.max(60, Math.min(WORLD_H - 60, car.y));
+
+      // 3. Smooth Camera Follow
+      camera.x = car.x - canvas.width / 2;
+      camera.y = car.y - canvas.height / 2;
+
+      // 4. District Banner Check
+      let newDistrict = "";
+      if (car.y > 3200) newDistrict = "ZONE 1: DOWNTOWN METRO";
+      else if (car.y > 1600) newDistrict = "ZONE 2: SUBURBAN GARDENS";
+      else newDistrict = "ZONE 3: SUNSET COASTLINE";
+
+      if (newDistrict !== currentDistrict) {
+        currentDistrict = newDistrict;
+        districtBanner.innerText = currentDistrict;
+      }
 
       const isStopped = Math.abs(car.speed) < 0.4;
       waveTick += 0.08;
 
-      // 3. Pickup Logic
+      // 5. Pickup Logic
       if (!hasPassenger && customer.active) {
         const d = Math.hypot(car.x - customer.x, car.y - customer.y);
         if (d < customer.r && isStopped) {
           hasPassenger = true;
           customer.active = false;
-          dropoff.x = Math.random() * (canvas.width - 240) + 120;
-          dropoff.y = Math.random() * (canvas.height - 340) + 170;
+          const loc = getFarLocation(car.y);
+          dropoff.x = loc.x;
+          dropoff.y = loc.y;
           dropoff.active = true;
-          timeLeft += 15.0; // Bonus time
-          currentFare = 45.00;
+          timeLeft += 35.0; // Extra time for long-distance cruise
+          currentFare = 120.00;
           fareVal.innerText = "$" + formatNumber(currentFare);
           playBeep(520, "triangle", 0.2);
           playBeep(780, "sine", 0.3);
         }
       }
 
-      // 4. Dropoff Logic
+      // 6. Dropoff Logic
       if (hasPassenger && dropoff.active) {
         const d = Math.hypot(car.x - dropoff.x, car.y - dropoff.y);
         if (d < dropoff.r && isStopped) {
@@ -262,110 +304,138 @@
           playBeep(990, "triangle", 0.4);
 
           setTimeout(() => {
-            customer.x = Math.random() * (canvas.width - 240) + 120;
-            customer.y = Math.random() * (canvas.height - 340) + 170;
+            const loc = getFarLocation(car.y);
+            customer.x = loc.x;
+            customer.y = loc.y;
             customer.active = true;
           }, 1200);
         }
       }
 
-      // RENDER CITY SCENE
+      // 7. RENDER THE WORLD (OFFSET BY CAMERA)
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.save();
+      ctx.translate(-camera.x, -camera.y);
 
-      // A. Asphalt Road
-      ctx.fillStyle = "#696969";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // --- ZONE 3: SUNSET COASTLINE (Y: 0 to 1600) ---
+      // Deep Blue Ocean (Left side)
+      ctx.fillStyle = "#1e6091";
+      ctx.fillRect(0, 0, 500, 1600);
+      // Animated Waves
+      ctx.strokeStyle = "rgba(255,255,255,0.4)";
+      ctx.lineWidth = 3;
+      for (let wy = 50; wy < 1600; wy += 90) {
+        const waveX = Math.sin(waveTick + wy) * 20 + 440;
+        ctx.beginPath();
+        ctx.arc(waveX, wy, 40, -Math.PI / 2, Math.PI / 2);
+        ctx.stroke();
+      }
+      // Sandy Beach (Middle)
+      ctx.fillStyle = "#f4d06f";
+      ctx.fillRect(500, 0, 400, 1600);
+      // Coastal Highway (Right side)
+      ctx.fillStyle = "#4a4e69";
+      ctx.fillRect(900, 0, WORLD_W - 900, 1600);
 
-      // B. Road Markings (White lane dashes)
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 4;
-      ctx.setLineDash([20, 20]);
+      // --- ZONE 2: SUBURBAN GARDENS (Y: 1600 to 3200) ---
+      // Lush Green Park Grass
+      ctx.fillStyle = "#588157";
+      ctx.fillRect(0, 1600, WORLD_W, 1600);
+      // Suburban Concrete Roads
+      ctx.fillStyle = "#6c757d";
+      ctx.fillRect(400, 1600, 1600, 1600);
+      // Central Park Lake
+      ctx.fillStyle = "#3a86ff";
       ctx.beginPath();
-      ctx.moveTo(canvas.width / 2, 0);
-      ctx.lineTo(canvas.width / 2, canvas.height);
+      ctx.arc(WORLD_W / 2, 2400, 220, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#a3b18a";
+      ctx.lineWidth = 12;
+      ctx.stroke();
+
+      // --- ZONE 1: DOWNTOWN METRO (Y: 3200 to WORLD_H) ---
+      // Dark City Asphalt
+      ctx.fillStyle = "#343a40";
+      ctx.fillRect(0, 3200, WORLD_W, WORLD_H - 3200);
+
+      // Draw Checkered Sidewalks & Brick Buildings in Downtown
+      for (let by = 3300; by < WORLD_H - 200; by += 350) {
+        drawSidewalk(80, by, 350, 120);
+        drawBuilding(80, by + 10, 350, 100);
+        drawSidewalk(WORLD_W - 450, by, 350, 120);
+        drawBuilding(WORLD_W - 450, by + 10, 350, 100);
+      }
+
+      // Draw Boulevard Lane Dividers along the central highway
+      ctx.strokeStyle = "#ffcc00";
+      ctx.lineWidth = 6;
+      ctx.setLineDash([35, 25]);
+      ctx.beginPath();
+      ctx.moveTo(WORLD_W / 2, 0);
+      ctx.lineTo(WORLD_W / 2, WORLD_H);
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // C. Sidewalks with Checkered Tiles (Top & Bottom)
-      drawSidewalk(0, 0, canvas.width, 110);
-      drawSidewalk(0, canvas.height - 90, canvas.width, 90);
-
-      // D. Red Brick Building Blocks
-      drawBuilding(20, 10, 180, 80);
-      drawBuilding(240, 10, 200, 80);
-
-      // E. Draw Customer (Sidewalk Dude)
+      // Draw Customer
       if (customer.active) {
-        // Red Pulsing Ring
-        const pulse = Math.sin(waveTick * 2) * 4;
+        const pulse = Math.sin(waveTick * 2) * 5;
         ctx.strokeStyle = "#ff1a1a";
-        ctx.lineWidth = 3.5;
+        ctx.lineWidth = 4;
         ctx.beginPath();
         ctx.arc(customer.x, customer.y, customer.r + pulse, 0, Math.PI * 2);
         ctx.stroke();
 
-        // Customer Figure
         drawPassengerFigure(customer.x, customer.y, Math.sin(waveTick * 3) > 0);
-
-        // Floating Red "$" Coin
-        const bob = Math.sin(waveTick * 3) * 6;
-        drawDollarBadge(customer.x, customer.y - 32 + bob);
+        drawDollarBadge(customer.x, customer.y - 34 + Math.sin(waveTick * 3) * 6);
       }
 
-      // F. Draw Destination Drop-Off
+      // Draw Dropoff Zone
       if (dropoff.active) {
         ctx.fillStyle = "rgba(0, 255, 100, 0.25)";
         ctx.strokeStyle = "#00ff66";
-        ctx.lineWidth = 4;
+        ctx.lineWidth = 5;
         ctx.beginPath();
         ctx.arc(dropoff.x, dropoff.y, dropoff.r, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
+        ctx.fill(); ctx.stroke();
         ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 14px Impact";
-        ctx.fillText("STOP HERE", dropoff.x - 30, dropoff.y + 5);
+        ctx.font = "bold 18px Impact";
+        ctx.fillText("DESTINATION", dropoff.x - 45, dropoff.y + 6);
       }
 
-      // G. Crazy Taxi Yellow Convertible
+      // Draw Taxi
       ctx.save();
       ctx.translate(car.x, car.y);
       ctx.rotate(car.angle);
 
-      // Taxi Shadow
-      ctx.fillStyle = "rgba(0,0,0,0.3)";
+      // Shadow
+      ctx.fillStyle = "rgba(0,0,0,0.35)";
       ctx.fillRect(-22, -10, 48, 28);
-
       // Wheels
       ctx.fillStyle = "#111";
       ctx.fillRect(-18, -16, 10, 5);
       ctx.fillRect(10, -16, 10, 5);
       ctx.fillRect(-18, 11, 10, 5);
       ctx.fillRect(10, 11, 10, 5);
-
-      // Yellow Body
+      // Body
       ctx.fillStyle = "#ffcc00";
       ctx.fillRect(-24, -13, 48, 26);
-
-      // Red Interior / Seats
+      // Seats
       ctx.fillStyle = "#c00";
       ctx.fillRect(-10, -9, 18, 18);
-
       // Driver
       ctx.fillStyle = "#ffcc99";
-      ctx.beginPath();
-      ctx.arc(-2, 0, 4, 0, Math.PI * 2);
-      ctx.fill();
-
+      ctx.beginPath(); ctx.arc(-2, 0, 4, 0, Math.PI * 2); ctx.fill();
       // Windshield
       ctx.fillStyle = "#e0f7fa";
       ctx.fillRect(8, -10, 4, 20);
-
-      // Taxi Checker Roof Decal
+      // Roof Decal
       ctx.fillStyle = "#000";
       ctx.fillRect(-20, -13, 4, 26);
-      ctx.restore();
 
-      // H. Crazy Taxi Signature Guide Arrow (Top Center)
+      ctx.restore();
+      ctx.restore(); // Restore world camera
+
+      // 8. SCREEN-SPACE HUD: Crazy Taxi Guide Arrow
       const target = hasPassenger ? dropoff : customer;
       if (target.active) {
         drawGuideArrow(target.x, target.y);
@@ -374,90 +444,58 @@
       requestAnimationFrame(gameLoop);
     }
 
-    // Helper: Sidewalk Checker Pattern
+    // World Helper Functions
     function drawSidewalk(x, y, w, h) {
       ctx.fillStyle = "#dcd6c8";
       ctx.fillRect(x, y, w, h);
       ctx.strokeStyle = "#b5ad9e";
       ctx.lineWidth = 1;
-      const size = 18;
-      for (let px = x; px < x + w; px += size) {
-        for (let py = y; py < y + h; py += size) {
-          ctx.strokeRect(px, py, size, size);
+      for (let px = x; px < x + w; px += 20) {
+        for (let py = y; py < y + h; py += 20) {
+          ctx.strokeRect(px, py, 20, 20);
         }
       }
-      // Sidewalk Curb Line
-      ctx.fillStyle = "#8a857b";
-      ctx.fillRect(x, y + h - 5, w, 5);
     }
 
-    // Helper: Red Brick Building
     function drawBuilding(x, y, w, h) {
-      ctx.fillStyle = "#b22222";
+      ctx.fillStyle = "#9b2226";
       ctx.fillRect(x, y, w, h);
-      ctx.strokeStyle = "#800000";
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#590d22";
+      ctx.lineWidth = 3;
       ctx.strokeRect(x, y, w, h);
-
-      // Windows
-      ctx.fillStyle = "#87ceeb";
-      for (let wx = x + 12; wx < x + w - 15; wx += 24) {
-        ctx.fillRect(wx, y + 15, 14, 20);
-        ctx.fillRect(wx, y + 45, 14, 20);
-      }
     }
 
-    // Helper: Passenger Stick Figure
     function drawPassengerFigure(x, y, armsUp) {
-      // Head
       ctx.fillStyle = "#ffcc99";
-      ctx.beginPath();
-      ctx.arc(x, y - 10, 5, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Blue Shirt Body
+      ctx.beginPath(); ctx.arc(x, y - 10, 6, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#0066cc";
-      ctx.fillRect(x - 4, y - 5, 8, 12);
-
-      // Waving Arms
+      ctx.fillRect(x - 5, y - 4, 10, 14);
       ctx.strokeStyle = "#0066cc";
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 3.5;
       ctx.beginPath();
       if (armsUp) {
-        ctx.moveTo(x - 4, y - 2); ctx.lineTo(x - 9, y - 12);
-        ctx.moveTo(x + 4, y - 2); ctx.lineTo(x + 9, y - 12);
+        ctx.moveTo(x - 5, y - 1); ctx.lineTo(x - 11, y - 12);
+        ctx.moveTo(x + 5, y - 1); ctx.lineTo(x + 11, y - 12);
       } else {
-        ctx.moveTo(x - 4, y - 2); ctx.lineTo(x - 9, y);
-        ctx.moveTo(x + 4, y - 2); ctx.lineTo(x + 9, y);
+        ctx.moveTo(x - 5, y - 1); ctx.lineTo(x - 11, y + 2);
+        ctx.moveTo(x + 5, y - 1); ctx.lineTo(x + 11, y + 2);
       }
       ctx.stroke();
-
-      // Pants
-      ctx.fillStyle = "#222";
-      ctx.fillRect(x - 4, y + 7, 3, 7);
-      ctx.fillRect(x + 1, y + 7, 3, 7);
     }
 
-    // Helper: Red "$" Badge
     function drawDollarBadge(x, y) {
       ctx.fillStyle = "#cc0000";
-      ctx.beginPath();
-      ctx.arc(x, y, 11, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-
+      ctx.beginPath(); ctx.arc(x, y, 12, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2; ctx.stroke();
       ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 13px Arial";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
+      ctx.font = "bold 14px Arial";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.fillText("$", x, y + 1);
     }
 
-    // Helper: 3D-Style Green Compass Arrow
-    function drawGuideArrow(tx, ty) {
-      const angle = Math.atan2(ty - car.y, tx - car.x);
+    function drawGuideArrow(targetWorldX, targetWorldY) {
+      // Calculate angle from taxi to target in world coordinates
+      const angle = Math.atan2(targetWorldY - car.y, targetWorldX - car.x);
       const cx = canvas.width / 2;
       const cy = 60;
 
@@ -469,10 +507,10 @@
       ctx.strokeStyle = "#005500";
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(25, 0);
-      ctx.lineTo(-15, -12);
-      ctx.lineTo(-8, 0);
-      ctx.lineTo(-15, 12);
+      ctx.moveTo(28, 0);
+      ctx.lineTo(-18, -14);
+      ctx.lineTo(-10, 0);
+      ctx.lineTo(-18, 14);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();

@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Desi Drift Taxi: Indian City Tour</title>
+  <title>Crazy Taxi 2D Arcade</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-    body { background-color: #1a1a1a; color: #fff; font-family: "Impact", "Arial Black", sans-serif; overflow: hidden; touch-action: none; }
+    body { background-color: #999; color: #fff; font-family: "Impact", "Arial Black", sans-serif; overflow: hidden; touch-action: none; }
 
     /* Crazy Taxi Retro Arcade HUD */
     #hud {
@@ -14,17 +14,20 @@
       display: flex; justify-content: space-between; align-items: flex-start;
       pointer-events: none; z-index: 10;
     }
-    
+
+    /* Top-Left Flame Countdown Timer */
     #timer-box {
       background: #000; border: 3px solid #ffcc00; border-radius: 6px;
       padding: 4px 10px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.6);
     }
     #timer-val {
-      font-size: 30px; color: #ff2200; text-shadow: 2px 2px 0 #ffe600, -1px -1px 0 #000;
+      font-size: 32px; color: #ff1a00;
+      text-shadow: 2px 2px 0 #ffe600, -1px -1px 0 #000;
       letter-spacing: 2px;
     }
     #timer-sub { font-size: 10px; color: #ffcc00; letter-spacing: 1px; }
 
+    /* Top-Right Yellow Roller Fare Meter */
     #meter-box {
       background: #ffcc00; border: 3px solid #b8860b; border-radius: 6px;
       padding: 4px 8px; text-align: right; box-shadow: 0 4px 10px rgba(0,0,0,0.6);
@@ -36,14 +39,7 @@
     }
     .roller-label { font-size: 9px; color: #333; font-weight: bold; }
 
-    /* Indian District Notification Banner */
-    #district-banner {
-      position: absolute; top: 88px; left: 50%; transform: translateX(-50%);
-      background: rgba(10, 10, 10, 0.88); border: 2px solid #ff9933; color: #ffcc00;
-      padding: 5px 16px; border-radius: 20px; font-size: 13px; font-weight: bold;
-      letter-spacing: 1px; pointer-events: none; z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,0.6);
-    }
-
+    /* Bottom-Right D/R Gear Box */
     #gear-box {
       position: absolute; bottom: 105px; right: 20px;
       background: #ffcc00; border: 3px solid #333; border-radius: 6px;
@@ -68,27 +64,25 @@
       box-shadow: 0 4px 8px rgba(0,0,0,0.5);
     }
     .t-btn:active { background: #ffcc00; color: #000; }
-    .pedal-gas { background: rgba(0, 170, 70, 0.7); border-color: #00ff66; }
-    .pedal-brake { background: rgba(210, 30, 30, 0.7); border-color: #ff3333; }
+    .pedal-gas { background: rgba(0, 180, 50, 0.7); border-color: #00ff66; }
+    .pedal-brake { background: rgba(220, 30, 30, 0.7); border-color: #ff3333; }
   </style>
 </head>
 <body>
 
   <div id="hud">
     <div id="timer-box">
-      <div id="timer-val">60"00</div>
+      <div id="timer-val">45"00</div>
       <div id="timer-sub">TIME LIMIT</div>
     </div>
 
     <div id="meter-box">
       <div class="roller-label">FARE</div>
-      <div class="roller-line" id="fare-val">₹000.00</div>
+      <div class="roller-line" id="fare-val">$000.00</div>
       <div class="roller-label">TOTAL EARNED</div>
-      <div class="roller-line" id="total-val">₹000.00</div>
+      <div class="roller-line" id="total-val">$000.00</div>
     </div>
   </div>
-
-  <div id="district-banner">OLD CHOWK BAZAAR</div>
 
   <div id="gear-box">
     <span id="gear-d" class="gear-active">D</span> | <span id="gear-r">R</span>
@@ -113,13 +107,20 @@
     const timerVal = document.getElementById("timer-val");
     const fareVal = document.getElementById("fare-val");
     const totalVal = document.getElementById("total-val");
-    const districtBanner = document.getElementById("district-banner");
     const gearD = document.getElementById("gear-d");
     const gearR = document.getElementById("gear-r");
 
-    // HUGE OPEN WORLD BOUNDARIES
-    const WORLD_W = 2400;
-    const WORLD_H = 4800;
+    // CITY GRID ARCHITECTURE
+    const BLOCK_W = 600;      // Size of one city block
+    const BLOCK_H = 600;
+    const ROAD_W = 220;       // Width of streets
+    const SIDEWALK_W = 65;    // Checkered sidewalk border
+    const CELL_W = BLOCK_W + ROAD_W; // 820px full repeating cell
+    const CELL_H = BLOCK_H + ROAD_W;
+    const GRID_COLS = 5;
+    const GRID_ROWS = 5;
+    const WORLD_W = GRID_COLS * CELL_W;
+    const WORLD_H = GRID_ROWS * CELL_H;
 
     function resize() {
       canvas.width = window.innerWidth;
@@ -128,7 +129,7 @@
     window.addEventListener("resize", resize);
     resize();
 
-    // Web Audio Synthesizer
+    // Audio FX
     let audioCtx = null;
     function initAudio() {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -148,36 +149,30 @@
       osc.stop(audioCtx.currentTime + duration);
     }
 
-    // Game Economy & State
+    // Game Variables
     let totalScore = 0;
     let currentFare = 0;
-    let timeLeft = 60.0;
+    let timeLeft = 45.0;
     let hasPassenger = false;
     let waveTick = 0;
-    let currentDistrict = "";
 
-    // Kaali-Peeli Taxi Player
+    // Start car inside a street lane next to the sidewalk
     const car = {
-      x: WORLD_W / 2, y: WORLD_H - 450,
+      x: CELL_W * 1.5 + ROAD_W / 4,
+      y: CELL_H * 1.5 + ROAD_W / 2,
       speed: 0, angle: -Math.PI / 2,
-      maxSpeed: 8.4, accel: 0.30, friction: 0.94, turnSpeed: 0.075
+      maxSpeed: 7.2, accel: 0.28, friction: 0.94, turnSpeed: 0.072
     };
 
     const camera = { x: 0, y: 0 };
 
-    // Targets
-    let customer = { x: WORLD_W / 2 - 160, y: WORLD_H - 700, r: 60, active: true };
-    let dropoff = { x: WORLD_W / 2 + 180, y: 750, r: 60, active: false };
-
-    // Indian Auto-Rickshaw Traffic (Green and Yellow)
-    const autos = [
-      { x: 300, y: WORLD_H - 1200, speed: 3.2, dir: 1 },
-      { x: WORLD_W - 400, y: WORLD_H - 850, speed: -3.0, dir: -1 },
-      { x: 500, y: 2400, speed: 3.8, dir: 1 },
-      { x: WORLD_W - 600, y: 2600, speed: -3.4, dir: -1 },
-      { x: 200, y: 700, speed: 4.5, dir: 1 },
-      { x: WORLD_W - 300, y: 950, speed: -4.2, dir: -1 }
-    ];
+    // Sidewalk customer spawn
+    let customer = {
+      x: CELL_W * 1 + ROAD_W + SIDEWALK_W / 2 + 10,
+      y: CELL_H * 1 + ROAD_W + 40,
+      r: 48, active: true
+    };
+    let dropoff = { x: 0, y: 0, r: 52, active: false };
 
     // Inputs
     const keys = { left: false, right: false, gas: false, brake: false };
@@ -205,19 +200,20 @@
     bindTouch("btn-gas", "gas");
     bindTouch("btn-brake", "brake");
 
-    function formatRupees(num) {
+    function formatNumber(num) {
       return num.toFixed(2).padStart(6, "0");
     }
 
-    function getFarLocation(currentY) {
-      const x = Math.random() * (WORLD_W - 700) + 350;
-      let y;
-      if (currentY > WORLD_H / 2) {
-        y = Math.random() * (WORLD_H * 0.42) + 200;
-      } else {
-        y = Math.random() * (WORLD_H * 0.42) + (WORLD_H * 0.52);
-      }
-      return { x, y };
+    // Pick a sidewalk corner in the city for passenger / destination
+    function getRandomSidewalkSpot() {
+      const col = Math.floor(Math.random() * (GRID_COLS - 1));
+      const row = Math.floor(Math.random() * (GRID_ROWS - 1));
+      const bx = col * CELL_W + ROAD_W;
+      const by = row * CELL_H + ROAD_W;
+      // Put them on the perimeter sidewalk corner
+      const onX = Math.random() > 0.5 ? bx + 30 : bx + BLOCK_W - 30;
+      const onY = Math.random() > 0.5 ? by + 30 : by + BLOCK_H - 30;
+      return { x: onX, y: onY };
     }
 
     function gameLoop() {
@@ -246,6 +242,7 @@
         car.speed *= car.friction;
       }
 
+      // Update Gear UI
       if (car.speed < -0.2) {
         gearD.className = ""; gearR.className = "gear-active";
       } else {
@@ -255,211 +252,160 @@
       car.x += Math.cos(car.angle) * car.speed;
       car.y += Math.sin(car.angle) * car.speed;
 
-      car.x = Math.max(70, Math.min(WORLD_W - 70, car.x));
-      car.y = Math.max(70, Math.min(WORLD_H - 70, car.y));
+      // Wrap around or clamp within world bounds
+      car.x = Math.max(50, Math.min(WORLD_W - 50, car.x));
+      car.y = Math.max(50, Math.min(WORLD_H - 50, car.y));
 
+      // Camera Centering
       camera.x = car.x - canvas.width / 2;
       camera.y = car.y - canvas.height / 2;
-
-      // Update Auto-Rickshaws
-      for (let a of autos) {
-        a.x += a.speed;
-        if (a.dir === 1 && a.x > WORLD_W - 200) a.x = 200;
-        if (a.dir === -1 && a.x < 200) a.x = WORLD_W - 200;
-      }
-
-      // 3. Indian District Detection
-      let newDistrict = "";
-      if (car.y > 3200) newDistrict = "ZONE 1: PURANA CHOWK & BAZAAR";
-      else if (car.y > 1600) newDistrict = "ZONE 2: HERITAGE GHATS & LAKE";
-      else newDistrict = "ZONE 3: NATIONAL HIGHWAY & DHABAS";
-
-      if (newDistrict !== currentDistrict) {
-        currentDistrict = newDistrict;
-        districtBanner.innerText = currentDistrict;
-      }
 
       const isStopped = Math.abs(car.speed) < 0.4;
       waveTick += 0.08;
 
-      // 4. Pickup
+      // 3. Pickup Logic
       if (!hasPassenger && customer.active) {
         const d = Math.hypot(car.x - customer.x, car.y - customer.y);
         if (d < customer.r && isStopped) {
           hasPassenger = true;
           customer.active = false;
-          const loc = getFarLocation(car.y);
-          dropoff.x = loc.x;
-          dropoff.y = loc.y;
+          const spot = getRandomSidewalkSpot();
+          dropoff.x = spot.x;
+          dropoff.y = spot.y;
           dropoff.active = true;
-          timeLeft += 35.0;
-          currentFare = 150.00;
-          fareVal.innerText = "₹" + formatRupees(currentFare);
+          timeLeft += 20.0;
+          currentFare = 55.00;
+          fareVal.innerText = "$" + formatNumber(currentFare);
           playBeep(520, "triangle", 0.2);
           playBeep(780, "sine", 0.3);
         }
       }
 
-      // 5. Dropoff
+      // 4. Dropoff Logic
       if (hasPassenger && dropoff.active) {
         const d = Math.hypot(car.x - dropoff.x, car.y - dropoff.y);
         if (d < dropoff.r && isStopped) {
           hasPassenger = false;
           dropoff.active = false;
           totalScore += currentFare;
-          totalVal.innerText = "₹" + formatRupees(totalScore);
+          totalVal.innerText = "$" + formatNumber(totalScore);
           currentFare = 0;
-          fareVal.innerText = "₹000.00";
+          fareVal.innerText = "$000.00";
           playBeep(660, "sine", 0.15);
           playBeep(990, "triangle", 0.4);
 
           setTimeout(() => {
-            const loc = getFarLocation(car.y);
-            customer.x = loc.x;
-            customer.y = loc.y;
+            const spot = getRandomSidewalkSpot();
+            customer.x = spot.x;
+            customer.y = spot.y;
             customer.active = true;
           }, 1200);
         }
       }
 
-      // 6. RENDER THE INDIAN CITY WORLD
+      // 5. RENDER THE CITY
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.save();
       ctx.translate(-camera.x, -camera.y);
 
-      // --- ZONE 3: NATIONAL HIGHWAY & DHABAS (Y: 0 to 1600) ---
-      // Dusty Sand terrain border
-      ctx.fillStyle = "#d4a373";
-      ctx.fillRect(0, 0, WORLD_W, 1600);
-      // Smooth Wide Asphalt Highway
-      ctx.fillStyle = "#2b2d42";
-      ctx.fillRect(350, 0, WORLD_W - 700, 1600);
-      
-      // Highway Yellow/White Striped Median
-      drawStripedMedian(WORLD_W / 2 - 10, 0, 20, 1600);
+      // BASE ROAD: Light textured grey asphalt
+      ctx.fillStyle = "#9c9c9c";
+      ctx.fillRect(camera.x, camera.y, canvas.width, canvas.height);
 
-      // Highway Dhabas (Roadside Punjabi Dhabas with Charpai cots)
-      drawDhaba(100, 300, 220, 150, "SHER-E-PUNJAB DHABA");
-      drawDhaba(WORLD_W - 320, 900, 220, 150, "HIGHWAY CHAI & TASTE");
+      // Draw all visible city blocks
+      for (let c = 0; c < GRID_COLS; c++) {
+        for (let r = 0; r < GRID_ROWS; r++) {
+          const bx = c * CELL_W + ROAD_W;
+          const by = r * CELL_H + ROAD_W;
 
-      // --- ZONE 2: HERITAGE GHATS & LAKE (Y: 1600 to 3200) ---
-      // Sandy clay ground
-      ctx.fillStyle = "#b08968";
-      ctx.fillRect(0, 1600, WORLD_W, 1600);
+          // Frustum culling: Only draw if inside camera view
+          if (bx + BLOCK_W < camera.x - 100 || bx > camera.x + canvas.width + 100 ||
+              by + BLOCK_H < camera.y - 100 || by > camera.y + canvas.height + 100) {
+            continue;
+          }
 
-      // Heritage Fort Sandstone Walls (Red Sandstone / Agrawali Stone)
-      drawFortWall(60, 1750, 260, 320);
-      drawFortWall(WORLD_W - 320, 1750, 260, 320);
+          // A. Road Lane Markings (White dashed lines in the middle of roads)
+          drawRoadMarkings(c * CELL_W, r * CELL_H);
 
-      // Road through the Heritage district
-      ctx.fillStyle = "#4a4e69";
-      ctx.fillRect(350, 1600, WORLD_W - 700, 1600);
+          // B. Sidewalk with terracotta curb & checkered tiles
+          drawSidewalkBlock(bx, by, BLOCK_W, BLOCK_H);
 
-      // Holy Lake (Talab / Kund)
-      ctx.fillStyle = "#0077b6";
-      ctx.beginPath();
-      ctx.arc(WORLD_W / 2, 2400, 230, 0, Math.PI * 2);
-      ctx.fill();
-      // Stone Stepwell Ghat border
-      ctx.strokeStyle = "#e6ccb2";
-      ctx.lineWidth = 16;
-      ctx.stroke();
+          // C. Red Brick Buildings
+          drawRedBuilding(bx + SIDEWALK_W, by + SIDEWALK_W, BLOCK_W - SIDEWALK_W * 2, BLOCK_H - SIDEWALK_W * 2);
 
-      // Lush Sacred Banyan / Peepal Trees
-      drawIndianTree(250, 2100);
-      drawIndianTree(220, 2700);
-      drawIndianTree(WORLD_W - 250, 2200);
-      drawIndianTree(WORLD_W - 220, 2800);
-
-      // --- ZONE 1: OLD CHOWK & BAZAAR (Y: 3200 to WORLD_H) ---
-      // Warm Earthy Chowk Floor
-      ctx.fillStyle = "#8d6e63";
-      ctx.fillRect(0, 3200, WORLD_W, WORLD_H - 3200);
-
-      // Cobblestone / Asphalt Bazaar Roads
-      ctx.fillStyle = "#3e2723";
-      ctx.fillRect(350, 3200, WORLD_W - 700, WORLD_H - 3200);
-
-      // Roadside Indian shops with striped awnings & Chai stalls
-      for (let by = 3350; by < WORLD_H - 250; by += 320) {
-        drawBazaarShop(70, by, 250, 100, "#d90429", "#ffcc00", "CHAI TAPRI");
-        drawBazaarShop(WORLD_W - 320, by, 250, 100, "#007f5f", "#ffffff", "ROYAL SWEETS");
+          // D. Sidewalk Props (Telephone booth, Street lamps, Flowerbeds)
+          drawStreetProps(bx, by);
+        }
       }
 
-      // Yellow/Black Painted Curbs along the main road
-      drawIndianCurbs(340, 0, 10, WORLD_H);
-      drawIndianCurbs(WORLD_W - 350, 0, 10, WORLD_H);
-
-      // Draw Auto-Rickshaw Traffic
-      for (let a of autos) {
-        drawAutoRickshaw(a.x, a.y, a.dir);
-      }
-
-      // Draw Customer
+      // 6. Draw Customer
       if (customer.active) {
+        // Red Pulsing Ring
         const pulse = Math.sin(waveTick * 2) * 5;
-        ctx.strokeStyle = "#ff9933";
-        ctx.lineWidth = 4;
+        ctx.strokeStyle = "#e60000";
+        ctx.lineWidth = 3.5;
         ctx.beginPath();
-        ctx.arc(customer.x, customer.y, customer.r + pulse, 0, Math.PI * 2);
+        ctx.ellipse(customer.x, customer.y, customer.r + pulse, (customer.r + pulse) * 0.75, 0, 0, Math.PI * 2);
         ctx.stroke();
 
-        drawIndianPassenger(customer.x, customer.y, Math.sin(waveTick * 3) > 0);
-        drawRupeeBadge(customer.x, customer.y - 34 + Math.sin(waveTick * 3) * 6);
+        drawWavingCustomer(customer.x, customer.y, Math.sin(waveTick * 3) > 0);
+        drawRedDollarCoin(customer.x, customer.y - 36 + Math.sin(waveTick * 3) * 6);
       }
 
-      // Draw Dropoff Zone
+      // 7. Draw Dropoff Target
       if (dropoff.active) {
         ctx.fillStyle = "rgba(0, 255, 100, 0.25)";
         ctx.strokeStyle = "#00ff66";
-        ctx.lineWidth = 5;
+        ctx.lineWidth = 4;
         ctx.beginPath();
         ctx.arc(dropoff.x, dropoff.y, dropoff.r, 0, Math.PI * 2);
-        ctx.fill(); ctx.stroke();
+        ctx.fill();
+        ctx.stroke();
         ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 18px Impact";
-        ctx.fillText("DESTINATION", dropoff.x - 45, dropoff.y + 6);
+        ctx.font = "bold 16px Impact";
+        ctx.fillText("STOP HERE", dropoff.x - 35, dropoff.y + 6);
       }
 
-      // Draw KAALI-PEELI TAXI (Classic Black Body + Yellow Roof)
+      // 8. Draw Player: CRAZY TAXI YELLOW CONVERTIBLE
       ctx.save();
       ctx.translate(car.x, car.y);
       ctx.rotate(car.angle);
 
       // Shadow
-      ctx.fillStyle = "rgba(0,0,0,0.38)";
-      ctx.fillRect(-24, -12, 50, 28);
+      ctx.fillStyle = "rgba(0,0,0,0.35)";
+      ctx.fillRect(-22, -10, 48, 28);
+
       // Wheels
-      ctx.fillStyle = "#111";
+      ctx.fillStyle = "#1a1a1a";
       ctx.fillRect(-18, -16, 10, 5);
       ctx.fillRect(10, -16, 10, 5);
       ctx.fillRect(-18, 11, 10, 5);
       ctx.fillRect(10, 11, 10, 5);
-      // Black Bottom Body
-      ctx.fillStyle = "#1c1c1c";
-      ctx.fillRect(-24, -13, 48, 26);
-      // Classic Yellow Roof
+
+      // Bright Yellow Car Body
       ctx.fillStyle = "#ffcc00";
-      ctx.fillRect(-14, -11, 28, 22);
-      // Red Seats
-      ctx.fillStyle = "#b71c1c";
-      ctx.fillRect(-8, -8, 14, 16);
-      // Driver with White Kurta / Cap
-      ctx.fillStyle = "#ffffff";
-      ctx.beginPath(); ctx.arc(-1, 0, 4, 0, Math.PI * 2); ctx.fill();
-      // Front Windshield
-      ctx.fillStyle = "#e0f7fa";
-      ctx.fillRect(8, -9, 4, 18);
-      // Roof Luggage Carrier / Taxi Light
-      ctx.fillStyle = "#333";
-      ctx.fillRect(-12, -9, 4, 18);
-      ctx.fillStyle = "#ff0000";
-      ctx.fillRect(-5, -4, 4, 8);
+      ctx.fillRect(-24, -13, 48, 26);
+
+      // Red Seats / Interior
+      ctx.fillStyle = "#cc0000";
+      ctx.fillRect(-10, -9, 18, 18);
+
+      // Driver (Blonde hair/cap)
+      ctx.fillStyle = "#ffeb3b";
+      ctx.beginPath(); ctx.arc(-2, 0, 4.5, 0, Math.PI * 2); ctx.fill();
+
+      // Windshield
+      ctx.fillStyle = "#cceeff";
+      ctx.fillRect(8, -10, 4, 20);
+
+      // Rear Taxi Fins & Decal
+      ctx.fillStyle = "#000";
+      ctx.fillRect(-22, -13, 3, 26);
 
       ctx.restore();
-      ctx.restore(); // End World offset
+      ctx.restore(); // Restore camera offset
 
-      // 7. Crazy Taxi Compass Arrow (Screen Space)
+      // 9. SCREEN-SPACE HUD: Crazy Taxi Guide Arrow
       const target = hasPassenger ? dropoff : customer;
       if (target.active) {
         drawGuideArrow(target.x, target.y);
@@ -468,149 +414,149 @@
       requestAnimationFrame(gameLoop);
     }
 
-    // --- ART HELPERS ---
+    // --- ART BUILDERS ---
 
-    // Bazaar Shop with Striped Canopy
-    function drawBazaarShop(x, y, w, h, col1, col2, title) {
-      ctx.fillStyle = "#deb887";
+    // 1. Sidewalk with terracotta curbs and checkered tile pattern
+    function drawSidewalkBlock(x, y, w, h) {
+      // Curb Drop Shadow
+      ctx.fillStyle = "#7a7a7a";
+      ctx.fillRect(x - 6, y - 6, w + 12, h + 12);
+
+      // Terracotta Pinkish-Red Curb Rim
+      ctx.fillStyle = "#d58977";
+      ctx.fillRect(x - 4, y - 4, w + 8, h + 8);
+
+      // Checkered Sidewalk Slab
+      ctx.fillStyle = "#eae5dc";
       ctx.fillRect(x, y, w, h);
-      ctx.strokeStyle = "#5c4033";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(x, y, w, h);
 
-      // Striped Awning Canopy
-      const stripeW = 16;
-      for (let sx = x; sx < x + w; sx += stripeW * 2) {
-        ctx.fillStyle = col1;
-        ctx.fillRect(sx, y + h - 22, stripeW, 22);
-        ctx.fillStyle = col2;
-        ctx.fillRect(sx + stripeW, y + h - 22, stripeW, 22);
-      }
-
-      // Shop Signboard
-      ctx.fillStyle = "#111";
-      ctx.fillRect(x + 10, y + 10, w - 20, 24);
-      ctx.fillStyle = "#ffcc00";
-      ctx.font = "bold 11px Arial";
-      ctx.textAlign = "center";
-      ctx.fillText(title, x + w / 2, y + 26);
-    }
-
-    // Roadside Highway Dhaba
-    function drawDhaba(x, y, w, h, name) {
-      ctx.fillStyle = "#c08552";
-      ctx.fillRect(x, y, w, h);
-      ctx.strokeStyle = "#7f4f24";
-      ctx.lineWidth = 3;
-      ctx.strokeRect(x, y, w, h);
-
-      // Signboard
-      ctx.fillStyle = "#b71c1c";
-      ctx.fillRect(x + 10, y + 10, w - 20, 28);
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 12px Arial";
-      ctx.textAlign = "center";
-      ctx.fillText(name, x + w / 2, y + 28);
-
-      // Traditional Charpai (Woven cots outside)
-      drawCharpai(x + 20, y + 70);
-      drawCharpai(x + 90, y + 70);
-      drawCharpai(x + 160, y + 70);
-    }
-
-    function drawCharpai(cx, cy) {
-      ctx.fillStyle = "#5c4033";
-      ctx.fillRect(cx, cy, 32, 22);
-      ctx.strokeStyle = "#f4a261";
+      // Checkered Tile Lines
+      ctx.strokeStyle = "#d6cfc2";
       ctx.lineWidth = 1;
-      ctx.strokeRect(cx + 2, cy + 2, 28, 18);
+      const tSize = 16;
+      for (let tx = x; tx < x + w; tx += tSize) {
+        ctx.beginPath(); ctx.moveTo(tx, y); ctx.lineTo(tx, y + h); ctx.stroke();
+      }
+      for (let ty = y; ty < y + h; ty += tSize) {
+        ctx.beginPath(); ctx.moveTo(x, ty); ctx.lineTo(x + w, ty); ctx.stroke();
+      }
+
+      // Beveled Chamfered Corner Curbs
+      ctx.fillStyle = "#9c9c9c"; // Cut corners to show street asphalt
+      ctx.beginPath();
+      ctx.moveTo(x - 5, y - 5); ctx.lineTo(x + 22, y - 5); ctx.lineTo(x - 5, y + 22); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(x + w + 5, y - 5); ctx.lineTo(x + w - 22, y - 5); ctx.lineTo(x + w + 5, y + 22); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(x - 5, y + h + 5); ctx.lineTo(x + 22, y + h + 5); ctx.lineTo(x - 5, y + h - 22); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(x + w + 5, y + h + 5); ctx.lineTo(x + w - 22, y + h + 5); ctx.lineTo(x + w + 5, y + h - 22); ctx.fill();
+
+      // Draw angled terracotta border along chamfers
+      ctx.strokeStyle = "#d58977";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(x + 22, y - 4); ctx.lineTo(x - 4, y + 22);
+      ctx.moveTo(x + w - 22, y - 4); ctx.lineTo(x + w + 4, y + 22);
+      ctx.moveTo(x + 22, y + h + 4); ctx.lineTo(x - 4, y + h - 22);
+      ctx.moveTo(x + w - 22, y + h + 4); ctx.lineTo(x + w + 4, y + h - 22);
+      ctx.stroke();
     }
 
-    // Heritage Fort Wall with battlements
-    function drawFortWall(x, y, w, h) {
-      ctx.fillStyle = "#a24838";
+    // 2. Red Brick Building with Blue Glass Windows
+    function drawRedBuilding(x, y, w, h) {
+      ctx.fillStyle = "#c92a2a";
       ctx.fillRect(x, y, w, h);
-      ctx.strokeStyle = "#6a1b0f";
+      ctx.strokeStyle = "#8f1d1d";
       ctx.lineWidth = 3;
       ctx.strokeRect(x, y, w, h);
 
-      // Battlements (Kanguras)
-      ctx.fillStyle = "#852617";
-      for (let bx = x; bx < x + w - 15; bx += 28) {
-        ctx.fillRect(bx, y, 16, 16);
+      // Blue Windows Grid
+      ctx.fillStyle = "#5dade2";
+      const winW = 18;
+      const winH = 26;
+      for (let wx = x + 16; wx < x + w - 20; wx += 30) {
+        for (let wy = y + 16; wy < y + h - 25; wy += 38) {
+          ctx.fillRect(wx, wy, winW, winH);
+          ctx.fillStyle = "rgba(255,255,255,0.45)";
+          ctx.fillRect(wx + 2, wy + 2, 4, winH - 4); // Window reflection
+          ctx.fillStyle = "#5dade2";
+        }
       }
     }
 
-    // Indian Banyan / Neem Tree
-    function drawIndianTree(x, y) {
-      ctx.fillStyle = "#582f0e";
-      ctx.beginPath(); ctx.arc(x, y, 14, 0, Math.PI * 2); ctx.fill();
-      // Lush Green Foliage
-      ctx.fillStyle = "rgba(45, 106, 79, 0.9)";
-      ctx.beginPath(); ctx.arc(x - 15, y - 10, 36, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(x + 18, y - 5, 34, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "rgba(82, 183, 136, 0.85)";
-      ctx.beginPath(); ctx.arc(x, y - 20, 38, 0, Math.PI * 2); ctx.fill();
-    }
+    // 3. Street Markings: STOP text & lane dividers
+    function drawRoadMarkings(rx, ry) {
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 4;
+      ctx.setLineDash([20, 20]);
 
-    // Indian Yellow & Black Road Curbs
-    function drawIndianCurbs(x, y, w, h) {
-      const segH = 25;
-      for (let cy = y; cy < y + h; cy += segH * 2) {
-        ctx.fillStyle = "#ffcc00";
-        ctx.fillRect(x, cy, w, segH);
-        ctx.fillStyle = "#111111";
-        ctx.fillRect(x, cy + segH, w, segH);
-      }
-    }
+      // Horizontal lane dash
+      ctx.beginPath();
+      ctx.moveTo(rx, ry + ROAD_W / 2);
+      ctx.lineTo(rx + CELL_W, ry + ROAD_W / 2);
+      ctx.stroke();
 
-    function drawStripedMedian(x, y, w, h) {
-      ctx.fillStyle = "#6c757d";
-      ctx.fillRect(x, y, w, h);
-      const segH = 30;
-      for (let my = y; my < y + h; my += segH * 2) {
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(x + 2, my, w - 4, segH);
-        ctx.fillStyle = "#ff9933";
-        ctx.fillRect(x + 2, my + segH, w - 4, segH);
-      }
-    }
+      // Vertical lane dash
+      ctx.beginPath();
+      ctx.moveTo(rx + ROAD_W / 2, ry);
+      ctx.lineTo(rx + ROAD_W / 2, ry + CELL_H);
+      ctx.stroke();
+      ctx.setLineDash([]);
 
-    // Green and Yellow Indian Auto-Rickshaw
-    function drawAutoRickshaw(x, y, dir) {
+      // Painted "STOP" on street before crosswalk
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.font = "bold 20px Arial";
       ctx.save();
-      ctx.translate(x, y);
-      if (dir === -1) ctx.scale(-1, 1);
-
-      // Body (Green bottom, Yellow roof canopy)
-      ctx.fillStyle = "#00873e"; // Green bottom
-      ctx.fillRect(-18, -10, 36, 20);
-      ctx.fillStyle = "#ffd100"; // Yellow canopy
-      ctx.fillRect(-12, -9, 24, 18);
-
-      // Front windshield
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(10, -7, 4, 14);
-
-      // Wheels
-      ctx.fillStyle = "#111";
-      ctx.fillRect(-14, -13, 8, 4);
-      ctx.fillRect(-14, 9, 8, 4);
-      ctx.fillRect(12, -2, 6, 4); // Front center wheel
-
+      ctx.translate(rx + ROAD_W / 2 + 30, ry + ROAD_W + 45);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText("STOP", 0, 0);
       ctx.restore();
     }
 
-    // Indian Passenger Figure (wearing Kurta)
-    function drawIndianPassenger(x, y, armsUp) {
+    // 4. Sidewalk Props: Red Phone Booth & Green Street Lamp
+    function drawStreetProps(bx, by) {
+      // Red Telephone Booth
+      const px = bx + 28;
+      const py = by + 28;
+      ctx.fillStyle = "#d90429";
+      ctx.fillRect(px, py, 20, 28);
+      ctx.fillStyle = "#bde0fe";
+      ctx.fillRect(px + 3, py + 3, 14, 22);
+      ctx.fillStyle = "#d90429";
+      ctx.fillRect(px + 8, py + 3, 4, 22); // Booth frame
+
+      // Vintage Green Streetlamp with Flowerbed Base
+      const lx = bx + BLOCK_W - 32;
+      const ly = by + 32;
+      // Flowerbed round base
+      ctx.fillStyle = "#588157";
+      ctx.beginPath(); ctx.arc(lx, ly, 14, 0, Math.PI * 2); ctx.fill();
+      // Flower blossoms (yellow & red dots)
+      ctx.fillStyle = "#ff0055";
+      ctx.fillRect(lx - 8, ly - 4, 3, 3);
+      ctx.fillRect(lx + 6, ly + 2, 3, 3);
+      ctx.fillStyle = "#ffcc00";
+      ctx.fillRect(lx - 2, ly + 6, 3, 3);
+      ctx.fillRect(lx + 4, ly - 6, 3, 3);
+      // Green Lamp Post & Head
+      ctx.fillStyle = "#2d6a4f";
+      ctx.beginPath(); ctx.arc(lx, ly, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "#2d6a4f";
+      ctx.lineWidth = 3;
+      ctx.strokeRect(lx - 6, ly - 6, 12, 12);
+    }
+
+    // 5. Waving Passenger Figure
+    function drawWavingCustomer(x, y, armsUp) {
       // Head
-      ctx.fillStyle = "#e0a96d";
-      ctx.beginPath(); ctx.arc(x, y - 10, 6, 0, Math.PI * 2); ctx.fill();
-      // Kurta Shirt (Bright Saffron / Orange)
-      ctx.fillStyle = "#ff7b00";
-      ctx.fillRect(x - 5, y - 4, 10, 15);
+      ctx.fillStyle = "#ffcc99";
+      ctx.beginPath(); ctx.arc(x, y - 10, 5.5, 0, Math.PI * 2); ctx.fill();
+      // Blue Shirt
+      ctx.fillStyle = "#0066cc";
+      ctx.fillRect(x - 5, y - 4, 10, 13);
       // Waving Arms
-      ctx.strokeStyle = "#ff7b00";
+      ctx.strokeStyle = "#0066cc";
       ctx.lineWidth = 3.5;
       ctx.beginPath();
       if (armsUp) {
@@ -621,19 +567,24 @@
         ctx.moveTo(x + 5, y - 1); ctx.lineTo(x + 11, y + 2);
       }
       ctx.stroke();
+      // Pants
+      ctx.fillStyle = "#2b2d42";
+      ctx.fillRect(x - 4, y + 9, 3, 7);
+      ctx.fillRect(x + 1, y + 9, 3, 7);
     }
 
-    // Indian Rupee (₹) Badge
-    function drawRupeeBadge(x, y) {
-      ctx.fillStyle = "#ff9933";
+    // 6. Floating Red "$" Coin Badge
+    function drawRedDollarCoin(x, y) {
+      ctx.fillStyle = "#cc0000";
       ctx.beginPath(); ctx.arc(x, y, 13, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2; ctx.stroke();
       ctx.fillStyle = "#ffffff";
       ctx.font = "bold 15px Arial";
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.fillText("₹", x, y + 1);
+      ctx.fillText("$", x, y + 1);
     }
 
+    // 7. Crazy Taxi Compass Arrow
     function drawGuideArrow(tx, ty) {
       const angle = Math.atan2(ty - car.y, tx - car.x);
       const cx = canvas.width / 2;
